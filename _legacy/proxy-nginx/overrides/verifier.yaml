@@ -1,0 +1,13 @@
+services:
+  avance-verifier-api:
+    ports: !reset []
+    networks:
+      - default
+      - gateway
+  postgres-avance-verifier:
+    ports: !reset []
+
+networks:
+  gateway:
+    name: avance-proxy
+    external: true

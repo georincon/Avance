@@ -1,0 +1,34 @@
+services:
+  onboarding-postgres:
+    ports: !reset []
+  onboarding-biometrics:
+    ports: !reset []
+    networks:
+      - default
+      - gateway
+  onboarding-backend:
+    ports: !reset []
+    networks:
+      - default
+      - gateway
+  postgres-nwp:
+    ports: !reset []
+  status-list-nwp:
+    ports: !reset []
+    networks:
+      - default
+      - gateway
+    environment:
+      STATUS_LIST_PUBLIC_URL: ${NW_STATUS_LIST_PUBLIC_URL:-https://civica-desarrollo.avance.org.co/newwallet-status/}
+  newwallet-provider:
+    ports: !reset []
+    networks:
+      - default
+      - gateway
+    environment:
+      ISSUER_PUBLICURL: ${NW_PROVIDER_PUBLIC_URL:-https://civica-desarrollo.avance.org.co/wallet-provider}
+
+networks:
+  gateway:
+    name: avance-proxy
+    external: true

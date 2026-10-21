@@ -1,0 +1,12 @@
+services:
+  postgres:
+    ports: !reset []
+  haproxy:
+    ports: !reset []
+    networks:
+      - default
+      - gateway
+networks:
+  gateway:
+    name: avance-proxy
+    external: true

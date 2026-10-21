@@ -1,0 +1,40 @@
+name: proxy-nginx
+services:
+  proxy-nginx:
+    image: nginx:1.27-alpine
+    container_name: proxy-nginx
+    restart: unless-stopped
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+      - "${PROXY_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - avance-acme-webroot:/var/www/certbot:ro
+      - avance-acme-certs:/etc/letsencrypt:ro
+    networks:
+      - gateway
+  certbot-renew:
+    build: ./certbot-renew
+    container_name: avance-certbot-renew
+    restart: unless-stopped
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        while true; do
+          certbot renew --quiet --deploy-hook "docker exec proxy-nginx nginx -s reload"
+          sleep 12h
+        done
+    volumes:
+      - avance-acme-webroot:/var/www/certbot
+      - avance-acme-certs:/etc/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock
+volumes:
+  avance-acme-webroot:
+    name: avance-acme-webroot
+  avance-acme-certs:
+    name: avance-acme-certs
+networks:
+  gateway:
+    name: avance-proxy
+    external: true
