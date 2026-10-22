@@ -133,6 +133,7 @@ const r = express.Router()
 const pagina = readFileSync(new URL('./publico/index.html', import.meta.url), 'utf8')
   .replaceAll('{{BASE}}', BASE).replaceAll('{{NOMBRE}}', NOMBRE)
 
+r.use('/publico', express.static(new URL('./publico', import.meta.url).pathname, { index: false }))
 r.get('/salud', (_req, res) => res.json({ estado: 'ok' }))
 r.get('/', (_req, res) => res.type('html').set('Cache-Control', 'no-store').send(pagina))
 r.get('/api/niveles', (_req, res) => res.json({

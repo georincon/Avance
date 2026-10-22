@@ -26,7 +26,7 @@
     "tipo": "urn:eudi:pid:1"
    }
   ],
-  "leido": "2026-10-22T13:39:46+00:00"
+  "leido": "2026-10-22T19:38:27+00:00"
  },
  "https://civica-desarrollo.avance.org.co/uis-issuer": {
   "configuraciones": [
@@ -92,5 +92,63 @@
    }
   ],
   "leido": "2026-10-22T15:12:02+00:00"
+ },
+ "https://civica-desarrollo.avance.org.co/eps": {
+  "configuraciones": [
+   {
+    "id": "co.eps.carne_afiliado",
+    "nombre": "co.eps.carne_afiliado",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:eps:carne-afiliado:1"
+   },
+   {
+    "id": "co.eps.historia_clinica",
+    "nombre": "co.eps.historia_clinica",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:eps:resumen-historia-clinica:1"
+   }
+  ],
+  "leido": "2026-10-22T19:38:27+00:00"
+ },
+ "https://civica-desarrollo.avance.org.co/notaria": {
+  "configuraciones": [
+   {
+    "id": "co.notaria.declaracion_extraproceso",
+    "nombre": "co.notaria.declaracion_extraproceso",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:notaria:declaracion-extraproceso:1"
+   },
+   {
+    "id": "co.notaria.poder_especial",
+    "nombre": "co.notaria.poder_especial",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:notaria:poder-especial:1"
+   },
+   {
+    "id": "co.notaria.reconocimiento_documento",
+    "nombre": "co.notaria.reconocimiento_documento",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:notaria:reconocimiento-documento:1"
+   },
+   {
+    "id": "co.notaria.fe_de_vida",
+    "nombre": "co.notaria.fe_de_vida",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:notaria:fe-de-vida:1"
+   },
+   {
+    "id": "co.notaria.autenticacion_firma",
+    "nombre": "co.notaria.autenticacion_firma",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:notaria:autenticacion-firma:1"
+   },
+   {
+    "id": "co.notaria.permiso_salida_menor",
+    "nombre": "co.notaria.permiso_salida_menor",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:notaria:permiso-salida-menor:1"
+   }
+  ],
+  "leido": "2026-10-22T19:38:27+00:00"
  }
 }

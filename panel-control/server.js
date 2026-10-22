@@ -12,6 +12,27 @@ const port = Number(process.env.PORT || 4173);
 const token = process.env.CONTROL_PANEL_TOKEN || '';
 if (token.length < 32) throw new Error('CONTROL_PANEL_TOKEN debe tener al menos 32 caracteres aleatorios.');
 
+/**
+ * Una aplicación de verifiers/<nombre> con su verifier.
+ *
+ * Son dos proyectos de Compose, cada uno con su .env (el de la app, y el de la instancia del
+ * verifier en verifiers/_comun/instancias/<nombre>). Los .env los crea `levantar.sh` la primera
+ * vez (claves, certificado de registro en el tl-publisher): el panel solo levanta y detiene lo
+ * que ya existe, y avisa si falta.
+ */
+function verifierApp(nombre, titulo, description, icon) {
+  const comun = 'verifiers/_comun';
+  return {
+    id:'verifier-' + nombre, name:titulo, group:'Verifiers', folder:'verifiers/' + nombre, compose:'compose.yml',
+    url:'/' + nombre + '/', icon, description,
+    containers:[nombre + '-' + nombre + '-1', 'verifier-' + nombre + '-haproxy-1', 'verifier-' + nombre + '-verifier-api-1', 'verifier-' + nombre + '-verifier-web-1'],
+    stacks:[
+      { project:'verifier-' + nombre, dir:comun, file:'compose.yml', env:'instancias/' + nombre + '/.env' },
+      { project:nombre, dir:'verifiers/' + nombre, file:'compose.yml', env:'.env' },
+    ],
+  };
+}
+
 const entries = [
   // Los dos emisores tienen su PROPIO Keycloak. El panel ofrece "Activar consola"
   // para dejar solo uno en pie: el proxy publico reescribe el Path de todas las
@@ -23,7 +44,15 @@ const entries = [
   { id:'wallet-provider', name:'Wallet Provider (único)', group:'Servicios de wallet', folder:'eudi-srv-wallet-provider/docker-compose', compose:'docker-compose.yaml', url:'/wallet-provider/', icon:'database', description:'Proveedor de wallet: emite WUA y Key Attestations', containers:['spartans-wallet-provider','postgres-spartans','status-list-spartans'], services:['spartans-wallet-provider','postgres-spartans','status-list-spartans'] },
   { id:'onboarding', name:'Onboarding', group:'Aplicaciones', folder:'srv-onboarding/docker-compose', compose:'docker-compose.yaml', url:'/onboarding/', icon:'wallet', description:'Onboarding de usuario (identity proofing)', containers:['onboarding-backend','onboarding-biometrics','onboarding-postgres'], services:['onboarding-backend','onboarding-biometrics','onboarding-postgres'] },
   { id:'app-new-wallet', name:'App New Wallet (ancla)', group:'Aplicaciones', folder:'app-new-wallet/docker-compose', compose:'docker-compose.yaml', url:'', icon:'wallet', description:'Ancla de la app Android en la red compartida: sin ella la app no alcanza al ecosistema', containers:['newwallet-anchor'], services:['network-anchor'] },
-  { id:'verifier', name:'Verifier', group:'Servicios de confianza', folder:'eudi-srv-verifier-local-build/docker-compose', compose:'docker-compose.yaml', url:'/verifier/actuator/health', icon:'shield', description:'Verificación de credenciales digitales (Relying Party)', containers:['avance-verifier-api'], services:['avance-verifier-api'] },
+  // Las aplicaciones de ejemplo de verifiers/ (una por sector). Cada una son DOS proyectos
+  // de Compose: la app (verifiers/<n>/compose.yml) y su verifier propio (verifiers/_comun,
+  // instancia <n>). No estan en el compose raiz, asi que se manejan con `stacks`, igual que la
+  // UIS tiene su propio compose. El orden importa: el verifier va primero.
+  verifierApp('banco', 'Verifier Banco', 'Banco Cívica: ingreso y apertura de cuenta presentando el PID', 'bank'),
+  verifierApp('contratacion', 'Verifier Contratación', 'Contratación: comprueba la formación académica de una persona candidata', 'briefcase'),
+  verifierApp('discoteca', 'Verifier Discoteca', 'Discoteca: comprueba la mayoría de edad sin guardar ningún dato', 'nightlife'),
+  verifierApp('notaria', 'Notaría', 'Notaría de ejemplo: verifica el PID y emite documentos notariales a la wallet', 'notary'),
+  verifierApp('eps', 'Verifier EPS', 'EPS: afiliación y portal médico con la wallet', 'health'),
   { id:'trust-validator', name:'Trust Validator', group:'Servicios de confianza', folder:'eudi-srv-trust-validator/docker-compose', compose:'docker-compose.yaml', url:'/trust-validator/actuator/health', icon:'shield', description:'Validador de confianza (LoTE/TSL)', containers:['trust-validator'], services:['trust-validator'] },
   { id:'tl-publisher', name:'Publicador de listas', group:'Servicios de confianza', folder:'srv-tl-publisher/docker-compose', compose:'docker-compose.yaml', url:'/tl-publisher/tl-api/v1/lists', icon:'shield', description:'Publica las Trusted Lists locales (ETSI TS 119 612)', containers:['tl-publisher','tl-publisher-pki','tlp-db'], services:['tl-publisher','pki','tlp-db'] },
   { id:'proxy-nginx', name:'Proxy Nginx (único)', group:'Gateway', folder:'srv-nw-nginx/docker-compose', compose:'docker-compose.yaml', url:'/', icon:'globe', description:'Punto de entrada único del ecosistema', service:'nw-nginx', isProxy:true, alwaysUp:true, containers:['nw-nginx','nw-certbot-renew'], services:['nw-nginx','certbot-renew'] }
@@ -172,8 +201,8 @@ function composeDe(project) {
  * ficheros de compose, para no mantener una lista escrita a mano que se queda
  * vieja.
  */
-async function asegurarRedes(composeFiles, cwd) {
-  const config = JSON.parse(await run(composeArgs({composeFiles}, ['config','--format','json']), cwd, 60_000));
+async function asegurarRedes(composeFiles, cwd, opciones = []) {
+  const config = JSON.parse(await run(composeArgs({composeFiles}, [...opciones, 'config','--format','json']), cwd, 60_000));
   const faltan = [];
   for (const [clave, red] of Object.entries(config.networks || {})) {
     if (!red.external) continue;
@@ -203,9 +232,36 @@ async function asegurarRedes(composeFiles, cwd) {
  *   sin `-v`: los volúmenes se conservan) y deja en pie el panel, que es quien
  *   está ejecutando la operación.
  */
+/**
+ * Levanta, detiene o reinicia una aplicación de verifiers/ (sus `stacks`, en orden).
+ * `down` los recorre al revés: primero la app y luego su verifier. Sin tocar volúmenes.
+ */
+async function accionStacks(project, action) {
+  const stacks = action === 'down' ? [...project.stacks].reverse() : project.stacks;
+  for (const stack of stacks) {
+    const cwd = path.resolve(root, stack.dir);
+    const env = path.resolve(cwd, stack.env);
+    try {
+      await access(env);
+    } catch {
+      throw new Error('Falta ' + path.relative(root, env) + ': se crea la primera vez con verifiers/' + project.id.slice(9) + '/levantar.sh.');
+    }
+    const base = ['compose', '-p', stack.project, '--env-file', env, '-f', path.resolve(cwd, stack.file)];
+    if (action === 'up') {
+      await asegurarRedes([path.resolve(cwd, stack.file)], cwd, ['-p', stack.project, '--env-file', env]);
+      await run([...base, 'up', '-d'], cwd, 10 * 60_000);
+    } else if (action === 'down') {
+      await run([...base, 'rm', '-f', '-s'], cwd, 10 * 60_000);
+    } else {
+      await run([...base, 'restart'], cwd, 10 * 60_000);
+    }
+  }
+}
+
 async function accionGlobal(action) {
   const resultados = [];
-  const delRaiz = projects.filter((project) => project.id !== 'issuer-uis');
+  const delRaiz = projects.filter((project) => project.id !== 'issuer-uis' && !project.stacks);
+  const verifiers = projects.filter((project) => project.stacks);
   const uis = projects.find((project) => project.id === 'issuer-uis');
 
   if (action === 'up') {
@@ -232,12 +288,20 @@ async function accionGlobal(action) {
         resultados.push({id:uis.id, name:uis.name, error:error.message});
       }
     }
+    for (const project of verifiers) {
+      try { await accionStacks(project, 'up'); }
+      catch (error) { resultados.push({id:project.id, name:project.name, error:error.message}); }
+    }
   } else {
     // Al bajar, el proxy se queda en pie: es por donde se entra al panel, y si
     // cae, la orden se pierde a medio hacer (la respuesta nunca llega al
     // navegador). Se para todo lo demas; el proxy devuelve 502 en lo que este
     // caido, que es justo lo que se quiere ver.
     const todos = (uis ? [...delRaiz, uis] : delRaiz).filter((project) => !project.alwaysUp);
+    for (const project of verifiers) {
+      try { await accionStacks(project, action); }
+      catch (error) { resultados.push({id:project.id, name:project.name, error:error.message}); }
+    }
     for (const project of todos) {
       const servicios = project.services || [];
       const args = action === 'down' ? ['rm','-f','-s', ...servicios] : ['restart', ...servicios];
@@ -327,6 +391,10 @@ const server = http.createServer(async (req, res) => {
           //    de sesion de Keycloak antes de abrir la consola.
           const estado = await status(project);
           return send(res, 200, { ...estado, limpiarCookies: true });
+        }
+        if (project.stacks) {
+          await accionStacks(project, action);
+          return send(res, 200, await status(project));
         }
         const ficheros = composeDe(project);
         const servicios = project.services || [];

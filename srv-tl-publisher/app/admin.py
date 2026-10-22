@@ -549,6 +549,9 @@ def crear_actor(cuerpo: ActorBody, x_api_key: str = Header(default=None)):
             raise HTTPException(400, " ".join(graves))
 
     tipo = ROLES[cuerpo.rol]
+    # El servicio no puede estar «concedido» desde DESPUÉS de que sus certificados empiezan a valer: el
+    # trust-validator descarta el ancla (p. ej. una CA creada segundos antes del registro).
+    desde = min([_ahora()] + [c.not_valid_before_utc.replace(tzinfo=None) for c in certs])
     with bd.conexion() as con:
         with con.cursor() as c:
             c.execute(
@@ -576,7 +579,7 @@ def crear_actor(cuerpo: ActorBody, x_api_key: str = Header(default=None)):
                     tipo,
                     json.dumps([]),
                     "http://uri.etsi.org/TrstSvc/TrustedList/Svcstatus/granted",
-                    _ahora(),
+                    desde,
                     json.dumps([{"lang": "en", "text": cuerpo.nombre}]),
                     _uri_multilang(f"{config.BASE_URL}/pki/cps"),
                     _operador(con),
@@ -595,7 +598,8 @@ def crear_actor(cuerpo: ActorBody, x_api_key: str = Header(default=None)):
                     cuerpo.correo, cuerpo.url_info, _ahora(),
                 ),
             )
-            actor_id = c.lastrowid
+            # actor_id no es autoincremental: es el service_id que se acaba de insertar.
+            actor_id = service_id
 
             for cert in certs:
                 info = _info_cert(cert)

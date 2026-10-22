@@ -1,0 +1,34 @@
+# La EPS de ejemplo. Cuelga de la red compartida "avance-eudi" con el alias app-PREFIJO: el nginx
+# central le pasa con la ruta completa https://DOMINIO/PREFIJO/… y
+# https://DOMINIO/.well-known/<x>/PREFIJO (la metadata del emisor). Habla con su
+# verifier (../_comun, instancia VERIFIER_INSTANCIA) por la misma red.
+#
+# Se usa con ./levantar.sh o, ya creada: docker compose -p eps --env-file .env logs -f
+name: eps
+
+services:
+  eps:
+    build: .
+    restart: unless-stopped
+    user: ${UID_GID:-1000:1000}
+    environment:
+      URL_PUBLICA: https://${DOMINIO}/${PREFIJO}
+      VERIFIER_API: http://verifier-${VERIFIER_INSTANCIA}/verifier-${VERIFIER_INSTANCIA}
+      TRUST_VALIDATOR_URL: ${TRUST_VALIDATOR_URL}
+      EPS_NOMBRE: ${EPS_NOMBRE}
+      ADMIN_CLAVE: ${ADMIN_CLAVE}
+      SECRETOS_DIR: /secretos
+      AFILIADOS_ARCHIVO: /datos/afiliados.json
+      MEDICOS_ARCHIVO: /datos/medicos.json
+      PUERTO: "80"
+    volumes:
+      - ./datos:/datos
+      - ./secretos:/secretos:ro
+    networks:
+      avance-eudi:
+        aliases: ["app-${PREFIJO}"]
+
+networks:
+  avance-eudi:
+    name: avance-eudi
+    external: true

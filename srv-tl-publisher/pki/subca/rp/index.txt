@@ -1,3 +1,5 @@
 V	290123224128Z		1000	unknown	/CN=Discoteca Neón/O=Discoteca Neón/C=CO
 V	290124133945Z		1001	unknown	/CN=Banco Cívica/O=Banco Cívica/C=CO
 V	290124151201Z		1002	unknown	/CN=Corporación Avance/O=Corporación Avance/C=CO
+V	290124160300Z		1003	unknown	/CN=EPS Salud Avance/O=EPS Salud Avance/C=CO
+V	290124191351Z		1004	unknown	/CN=Notaría Avance/O=Notaría Avance/C=CO

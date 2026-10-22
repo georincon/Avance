@@ -89,3 +89,13 @@ La idea del usuario: el empleador (p. ej. Avance) ofrece **un QR por nivel acad�
 - Prueba con la wallet v2: que el filtro por valor ofrezca solo la credencial del nivel (se verificó en el código de
   referencia, no en el binario de la app), y qué muestra el historial.
 - Para verificar, el stack de la UIS tiene que estar arriba (su status list). La Registraduría y la UIS comparten máquina.
+
+## Prueba con la wallet y ajuste del portal (2026-10-22)
+- Prueba real: 3 verificaciones (Especialización ×2, Pregrado) sin rechazos. En las tres viajaron solo 4 datos siempre
+  visibles (institución, país, autoridad, fecha de emisión) y 5 divulgados (nivel, estado, título, fecha de grado,
+  programa): no viajó cédula, usuario estudiantil, nombre, correo ni celular. El arreglo del emisor funciona.
+- Ajuste pedido: al verificar un nivel, **su botón se pone verde y se desactiva** («✔ Verificado») y **los datos compartidos
+  quedan abajo** del portal, uno por nivel; «Confirmar identidad» añade ahí la identidad; «Quitar de la pantalla» borra
+  el bloque y vuelve a habilitar el botón. Todo en memoria del navegador, nada en disco ni en el servidor.
+- Comprobado en un navegador con el servidor simulado: un nivel verde y desactivado, los demás libres, Bachiller bloqueado,
+  dos niveles a la vez, identidad en el bloque correspondiente.

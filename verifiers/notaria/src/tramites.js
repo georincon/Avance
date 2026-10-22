@@ -1,0 +1,66 @@
+// El protocolo de la notaría: un archivo JSON con cada trámite, solo para el ejemplo.
+//
+// Cada trámite tiene un número consecutivo (como en el protocolo de una notaría
+// real), la persona que lo hizo (verificada con su PID), los datos que escribió
+// y su índice en la status list. Anular un trámite pone su bit a 1.
+
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
+
+export function crearTramites(archivo) {
+  if (!existsSync(archivo)) {
+    mkdirSync(dirname(archivo), { recursive: true })
+    writeFileSync(archivo, `${JSON.stringify({ siguiente: 1, tramites: [] }, null, 2)}\n`)
+  }
+  const leer = () => JSON.parse(readFileSync(archivo, 'utf8'))
+  const guardar = (p) => {
+    writeFileSync(`${archivo}.tmp`, `${JSON.stringify(p, null, 2)}\n`)
+    renameSync(`${archivo}.tmp`, archivo)
+  }
+
+  return {
+    crear({ tipo, persona, datos }) {
+      const p = leer()
+      const n = p.siguiente++
+      const tramite = {
+        numero: `${new Date().getFullYear()}-${String(n).padStart(5, '0')}`,
+        tipo,
+        fecha: new Date().toISOString(),
+        persona,
+        datos,
+        // El índice en la status list es el consecutivo: nunca se reutiliza.
+        indice_estado: n,
+        estado: 'vigente',
+        entregas: 0,
+      }
+      p.tramites.push(tramite)
+      guardar(p)
+      return tramite
+    },
+
+    buscar: (numero) => leer().tramites.find((t) => t.numero === numero) ?? null,
+
+    dePersona: (documento) => leer().tramites.filter((t) => t.persona.documento === documento).reverse(),
+
+    anular(numero, motivo) {
+      const p = leer()
+      const t = p.tramites.find((x) => x.numero === numero)
+      if (!t || t.estado === 'anulado') return t ?? null
+      t.estado = 'anulado'
+      t.anulado = { fecha: new Date().toISOString(), motivo }
+      guardar(p)
+      return t
+    },
+
+    registrarEntrega(numero) {
+      const p = leer()
+      const t = p.tramites.find((x) => x.numero === numero)
+      if (t) {
+        t.entregas = (t.entregas ?? 0) + 1
+        guardar(p)
+      }
+    },
+
+    anulados: () => leer().tramites.filter((t) => t.estado === 'anulado').map((t) => t.indice_estado),
+  }
+}

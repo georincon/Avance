@@ -28,7 +28,7 @@ quiere ver.
 | Wallet Provider (único) | `eudi-srv-wallet-provider` | `/wallet-provider` |
 | Onboarding | `srv-onboarding` | `/onboarding` |
 | Ancla de la app Android | `app-new-wallet` | (no tiene ruta: no es web) |
-| Verificador | `eudi-srv-verifier-local-build` | `/verifier` |
+| Verifiers (banco, contratación, discoteca, EPS) | `verifiers/<nombre>` + su verifier en `verifiers/_comun` | `/<nombre>/` |
 | Validador de confianza | `eudi-srv-trust-validator` | `/trust-validator` |
 | Publicador de listas | `srv-tl-publisher` | `/tl-publisher` |
 | Proxy Nginx (único) | `srv-nw-nginx` | (todo) |
@@ -101,7 +101,7 @@ curl -sk -X POST https://civica-desarrollo.avance.org.co/api/all/action \
 ```
 
 Los `id` son: `issuer-registraduria`, `issuer-uis`, `wallet-provider`, `onboarding`,
-`app-new-wallet`, `verifier`, `trust-validator`, `tl-publisher`, `proxy-nginx`.
+`app-new-wallet`, `trust-validator`, `tl-publisher`, `proxy-nginx`.
 
 `/api/all/action` acepta `up`, `down` y `restart`, y devuelve el estado resultante de cada
 stack: `{"action":"up","ok":true,"results":[{"id":"...","state":"running","ok":true}, ...]}`.
