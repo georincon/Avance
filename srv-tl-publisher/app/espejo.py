@@ -43,6 +43,7 @@ from cryptography.hazmat.primitives import serialization
 import anclas
 import config
 import firma
+import lote
 
 TIPO = "tl+jwt"
 
@@ -97,6 +98,12 @@ def construir(*, esquema, secuencia, emision, proxima_actualizacion,
         "xml_sha256": xml_sha256,
         "services": servicios,
     }
+
+    # El formato que lee la wallet (ETSI TS 119 602): se AÑADE `LoTE`, sin quitar nada de lo
+    # anterior (la wallet ignora las claves que no conoce). La LOTL no lo lleva: la wallet no
+    # la usa, lee cada lista por su URL. Ver lote.py.
+    if esquema["scheme_slug"] != "LOTL":
+        payload["LoTE"] = lote.construir(xml_bytes, esquema["scheme_slug"], secuencia)
 
     # Sólo la LOTL lleva punteros. El XML ya los tiene (PointersToOtherTSL);
     # esto es la MISMA información en el espejo JSON, para que un consumidor

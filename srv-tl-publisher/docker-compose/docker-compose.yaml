@@ -115,6 +115,9 @@ services:
       # una CRL vencida hace fallar una validación estricta igual que una
       # revocación, aunque no haya cambiado nada.
       - CRL_REFRESH_HOURS=6
+      # La clave con la que el publicador pide emitir un certificado de acceso
+      # (POST /issue/rp-access). Sin ella el servicio responde 503 a cada registro de verifier.
+      - PKI_ISSUE_API_KEY=${PKI_ISSUE_API_KEY}
     # Corre con el uid del dueño de las claves: las de las sub-CAs están en
     # 0400 y no se van a aflojar en el host para que quepan en la imagen.
     user: "${PKI_UID:-1000}:${PKI_GID:-1000}"
@@ -122,6 +125,10 @@ services:
       # SOLO subca/ y publico/. `pki/root/` NO se monta: así la clave de la
       # raíz no está al alcance de este contenedor por construcción.
       - ../pki/subca:/pki/subca:ro
+      # La sub-CA `rp` es la unica que se abre en escritura: al emitir un access certificate
+      # (POST /issue/rp-access) hay que anotar el serial, index.txt y newcerts/. Las demas
+      # siguen de solo lectura.
+      - ../pki/subca/rp:/pki/subca/rp
       - ../pki/publico:/pki/publico
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8080/health')"]

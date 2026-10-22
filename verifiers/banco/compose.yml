@@ -1,0 +1,34 @@
+# Banco Cívica: ingreso y apertura de cuenta con la wallet, sin contraseñas. Se une a la red
+# compartida "avance-eudi" con el alias app-banco (srv-nw-nginx le pasa /banco/… con la ruta
+# completa) y habla con su verifier (../_comun, instancia VERIFIER_INSTANCIA) por la misma red,
+# usando el alias de su haproxy, sin salir a internet.
+#
+# Se usa con ./levantar.sh (que levanta antes el verifier) o, ya creado:
+#   docker compose -p banco --env-file .env logs -f
+name: banco
+
+services:
+  banco:
+    build: .
+    restart: unless-stopped
+    # El dueño de ./datos (quien ejecutó levantar.sh), para poder escribir clientes.json.
+    user: ${UID_GID:-1000:1000}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      URL_PUBLICA: https://${DOMINIO}/${PREFIJO}
+      VERIFIER_API: http://verifier-${VERIFIER_INSTANCIA}/verifier-${VERIFIER_INSTANCIA}
+      NOMBRE_BANCO: ${NOMBRE_BANCO}
+      CLIENTES_ARCHIVO: /datos/clientes.json
+      PUERTO: "80"
+    volumes:
+      - ./datos:/datos
+    networks:
+      avance-eudi:
+        aliases: ["app-${PREFIJO}"]
+
+networks:
+  avance-eudi:
+    name: avance-eudi
+    external: true

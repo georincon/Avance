@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{NOMBRE}} · Verificación de formación académica</title>
+<style>
+  :root {
+    --fondo: #f4f6fa; --superficie: #ffffff; --texto: #17202e; --suave: #5a6b80; --borde: #dbe2ec;
+    --marca: #1f4fd6; --marca-oscuro: #163aa3; --ok: #0f7b4b; --ok-fondo: #e4f6ec; --error: #b42318; --error-fondo: #fdecea;
+    --sombra: 0 1px 2px rgba(20,30,50,.06), 0 6px 20px rgba(20,30,50,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fondo: #0f141c; --superficie: #171e29; --texto: #e8edf5; --suave: #98a6ba; --borde: #2a3445;
+      --marca: #6b93ff; --marca-oscuro: #9db6ff; --ok: #4cc38a; --ok-fondo: #12301f; --error: #ff8a80; --error-fondo: #3a1b19; --sombra: none; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--superficie); border-bottom: 1px solid var(--borde); }
+  .barra { max-width: 1040px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 12px; }
+  .logo { width: 34px; height: 34px; border-radius: 9px; background: var(--marca); color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .barra strong { font-size: 1.02rem; } .barra span { color: var(--suave); font-size: .92rem; }
+  main { max-width: 1040px; margin: 0 auto; padding: 28px 20px 56px; }
+  h1 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); line-height: 1.2; margin: 0 0 10px; }
+  .intro p { color: var(--suave); max-width: 62ch; margin: 0 0 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin: 26px 0; }
+  .nivel { text-align: left; background: var(--superficie); color: var(--texto); border: 1px solid var(--borde); border-radius: 14px;
+    padding: 18px; cursor: pointer; box-shadow: var(--sombra); font: inherit; transition: transform .12s, border-color .12s; }
+  .nivel:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--marca); }
+  .nivel:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
+  .nivel b { display: block; font-size: 1.12rem; margin-bottom: 4px; }
+  .nivel small { color: var(--suave); }
+  .nivel:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+  .privacidad { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 680px) { .privacidad { grid-template-columns: 1fr; } }
+  .caja { background: var(--superficie); border: 1px solid var(--borde); border-radius: 14px; padding: 18px 20px; }
+  .caja h2 { font-size: 1rem; margin: 0 0 8px; }
+  .caja ul { margin: 0; padding-left: 20px; color: var(--suave); } .caja li { margin: 3px 0; }
+  .caja.si h2 { color: var(--ok); } .caja.no h2 { color: var(--error); }
+  dialog { border: 0; border-radius: 18px; padding: 0; width: min(520px, calc(100vw - 28px)); background: var(--superficie); color: var(--texto); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+  dialog::backdrop { background: rgba(10,15,25,.55); }
+  .cuerpo { padding: 24px; } .cuerpo h2 { margin: 0 0 4px; font-size: 1.25rem; }
+  .sub { color: var(--suave); margin: 0 0 16px; font-size: .95rem; }
+  .qr { display: block; margin: 8px auto 12px; width: 260px; max-width: 100%; height: auto; border-radius: 12px; background: #fff; padding: 8px; }
+  .pasos { color: var(--suave); font-size: .92rem; margin: 0 0 12px; padding-left: 20px; }
+  .pide { background: var(--fondo); border-radius: 10px; padding: 10px 14px; font-size: .9rem; color: var(--suave); margin: 0 0 14px; }
+  .pide b { color: var(--texto); }
+  .acciones { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 16px; }
+  button.p, button.s { font: inherit; border-radius: 10px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--borde); }
+  button.p { background: var(--marca); color: #fff; border-color: var(--marca); } button.p:hover { background: var(--marca-oscuro); }
+  button.s { background: transparent; color: var(--texto); } button.s:hover { border-color: var(--marca); }
+  .sello { display: inline-flex; align-items: center; gap: 8px; background: var(--ok-fondo); color: var(--ok); font-weight: 600; padding: 6px 12px; border-radius: 999px; margin-bottom: 12px; }
+  .sello.mal { background: var(--error-fondo); color: var(--error); }
+  dl { margin: 0; } .fila { display: flex; justify-content: space-between; gap: 18px; padding: 10px 0; border-bottom: 1px solid var(--borde); }
+  .fila:last-child { border-bottom: 0; } dt { color: var(--suave); } dd { margin: 0; text-align: right; font-weight: 600; }
+  h3 { font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--suave); margin: 18px 0 2px; }
+  .cuenta { color: var(--suave); font-size: .85rem; text-align: center; min-height: 1.3em; }
+  .cargando { text-align: center; color: var(--suave); padding: 30px 0; }
+  footer { max-width: 1040px; margin: 0 auto; padding: 0 20px 28px; color: var(--suave); font-size: .85rem; }
+</style>
+</head>
+<body>
+<header><div class="barra"><div class="logo" aria-hidden="true">A</div><div><strong>{{NOMBRE}}</strong><br><span>Verificación de formación académica</span></div></div></header>
+<main>
+  <section class="intro">
+    <h1>Comprueba la formación de una persona candidata</h1>
+    <p>Elige el nivel que necesitas verificar. Se mostrará un código QR que la persona escanea con su wallet y, si ella acepta, recibes la confirmación firmada por su universidad.</p>
+    <p>Solo se aceptan credenciales de personas <strong>graduadas</strong> en el nivel elegido.</p>
+  </section>
+  <div class="grid" id="niveles" role="list" aria-label="Niveles académicos"></div>
+  <section class="privacidad" aria-label="Qué datos se piden">
+    <div class="caja si"><h2>Lo que se pide</h2><ul>
+      <li>Nombre del programa y título otorgado</li><li>Fecha de grado</li><li>Universidad que emitió la credencial</li></ul></div>
+    <div class="caja no"><h2>Lo que no se pide</h2><ul>
+      <li>Nombre y documento (solo si luego confirmas la identidad)</li><li>Promedio, créditos y datos de contacto</li><li>Cualquier otro dato de la credencial</li></ul></div>
+  </section>
+</main>
+<footer>Los datos no se guardan: se muestran en esta pantalla unos minutos y se borran. La wallet de la persona le muestra qué se pide y para qué antes de que acepte.</footer>
+
+<dialog id="modal" aria-labelledby="titulo"><div class="cuerpo" id="contenido"></div></dialog>
+
+<script>
+(() => {
+  const BASE = '{{BASE}}'
+  const $ = (id) => document.getElementById(id)
+  const modal = $('modal'), contenido = $('contenido')
+  let sondeo = null, cuenta = null
+
+  function el(tag, props = {}, ...hijos) {
+    const e = document.createElement(tag)
+    for (const [k, v] of Object.entries(props)) {
+      if (k === 'class') e.className = v
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v)
+      else e.setAttribute(k, v)
+    }
+    for (const h of hijos.flat()) if (h != null) e.append(h.nodeType ? h : document.createTextNode(String(h)))
+    return e
+  }
+  const fecha = (f) => f ? new Date(f).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) : '—'
+  const api = async (ruta, opciones) => {
+    const r = await fetch(BASE + ruta, opciones)
+    return { ok: r.ok, estado: r.status, cuerpo: await r.json().catch(() => ({})) }
+  }
+  const parar = () => { clearInterval(sondeo); clearInterval(cuenta); sondeo = cuenta = null }
+  modal.addEventListener('close', parar)
+  const cerrar = () => { parar(); modal.close() }
+
+  const fila = (k, v) => el('div', { class: 'fila' }, el('dt', {}, k), el('dd', {}, v ?? '—'))
+
+  async function iniciar(nivel, paso = 'formacion', previa) {
+    parar()
+    contenido.replaceChildren(el('div', { class: 'cargando' }, 'Preparando el código…'))
+    if (!modal.open) modal.showModal()
+    const { ok, cuerpo } = await api('/api/solicitud', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nivel: nivel.clave, paso, previa }),
+    })
+    if (!ok) return mostrarError(cuerpo.error ?? 'No se pudo crear la solicitud.', nivel, paso, previa)
+    mostrarQr(nivel, paso, previa, cuerpo)
+  }
+
+  function mostrarQr(nivel, paso, previa, s) {
+    const identidad = paso === 'identidad'
+    const pide = identidad ? 'Nombres, apellidos y documento de identidad' : 'Programa, título y fecha de grado'
+    const restante = el('div', { class: 'cuenta' })
+    contenido.replaceChildren(
+      el('h2', { id: 'titulo' }, identidad ? `Confirmar identidad · ${nivel.nombre}` : `Verificar ${nivel.nombre}`),
+      el('p', { class: 'sub' }, identidad ? 'Segundo paso, opcional: la persona comparte quién es.' : 'Muestra este código a la persona candidata.'),
+      el('img', { class: 'qr', src: s.qr, alt: 'Código QR para escanear con la wallet' }),
+      restante,
+      el('ol', { class: 'pasos' }, el('li', {}, 'Abre tu wallet y escanea el código.'), el('li', {}, 'Revisa lo que se pide y acepta.'), el('li', {}, 'El resultado aparece aquí.')),
+      el('div', { class: 'pide' }, el('b', {}, 'Se pide: '), pide, el('br'), el('b', {}, 'Condición: '), `credencial de ${nivel.nombre} y graduado/a.`),
+      el('div', { class: 'acciones' }, el('button', { class: 's', onclick: () => navigator.clipboard?.writeText(s.enlace) }, 'Copiar enlace'), el('button', { class: 's', onclick: cerrar }, 'Cancelar')),
+    )
+    const limite = Date.now() + s.vence_en * 1000
+    cuenta = setInterval(() => {
+      const seg = Math.max(0, Math.round((limite - Date.now()) / 1000))
+      restante.textContent = `El código vence en ${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`
+    }, 1000)
+    sondeo = setInterval(async () => {
+      const { cuerpo } = await api('/api/solicitud/' + s.id)
+      if (cuerpo.estado === 'listo') { parar(); mostrarResultado(nivel, s.id, cuerpo) }
+      else if (cuerpo.estado === 'rechazada') { parar(); mostrarError(cuerpo.motivo, nivel, paso, previa) }
+    }, 2000)
+  }
+
+  function mostrarResultado(nivel, id, r) {
+    const f = r.formacion, i = r.identidad
+    const hijos = [
+      el('span', { class: 'sello' }, '✔ Verificado'),
+      el('h2', { id: 'titulo' }, `${nivel.nombre} · graduado/a`),
+      el('p', { class: 'sub' }, `Credencial emitida por ${f?.institucion ?? 'la universidad'}. Firma, emisor de confianza y estado comprobados.`),
+      el('h3', {}, 'Formación'),
+      el('dl', {}, fila('Nivel', nivel.nombre), fila('Programa', f?.programa), fila('Título', f?.titulo), fila('Fecha de grado', fecha(f?.fecha_grado)), fila('Institución', f?.institucion)),
+    ]
+    if (i) hijos.push(el('h3', {}, 'Identidad'), el('dl', {}, fila('Nombres', i.nombres), fila('Apellidos', i.apellidos), fila('Documento', `${i.tipo_documento ? i.tipo_documento + ' ' : ''}${i.documento}`)))
+    const acciones = [el('button', { class: 's', onclick: cerrar }, 'Cerrar')]
+    if (!i) acciones.unshift(el('button', { class: 'p', onclick: () => iniciar(nivel, 'identidad', id) }, 'Confirmar identidad (opcional)'))
+    hijos.push(el('div', { class: 'acciones' }, ...acciones))
+    contenido.replaceChildren(...hijos)
+  }
+
+  function mostrarError(motivo, nivel, paso, previa) {
+    contenido.replaceChildren(
+      el('span', { class: 'sello mal' }, '✖ No verificado'),
+      el('h2', { id: 'titulo' }, 'No se pudo verificar'),
+      el('p', { class: 'sub' }, motivo),
+      el('div', { class: 'acciones' }, el('button', { class: 's', onclick: cerrar }, 'Cerrar'), el('button', { class: 'p', onclick: () => iniciar(nivel, paso, previa) }, 'Generar un código nuevo')),
+    )
+  }
+
+  api('/api/niveles').then(({ cuerpo }) => {
+    $('niveles').replaceChildren(...cuerpo.niveles.map((n) => {
+      const b = el('button', { class: 'nivel', role: 'listitem' }, el('b', {}, n.nombre), el('small', {}, n.disponible ? 'Generar código QR' : (n.nota ?? 'No disponible')))
+      if (!n.disponible) b.disabled = true
+      else b.addEventListener('click', () => iniciar(n))
+      return b
+    }))
+  })
+})()
+</script>
+</body>
+</html>

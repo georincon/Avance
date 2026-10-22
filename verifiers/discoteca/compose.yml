@@ -1,0 +1,29 @@
+# Discoteca: control de edad en la puerta. Se une a la red compartida "avance-eudi" con el
+# alias app-discoteca (srv-nw-nginx le pasa /discoteca/… con la ruta completa) y habla con su
+# verifier (../_comun, instancia VERIFIER_INSTANCIA) por la misma red, usando el alias de su
+# haproxy. Sin volúmenes: no guarda nada.
+#
+#   ./levantar.sh, o ya creada: docker compose -p discoteca --env-file .env logs -f
+name: discoteca
+
+services:
+  discoteca:
+    build: .
+    restart: unless-stopped
+    read_only: true
+    environment:
+      URL_PUBLICA: https://${DOMINIO}/${PREFIJO}
+      VERIFIER_API: http://verifier-${VERIFIER_INSTANCIA}/verifier-${VERIFIER_INSTANCIA}
+      NOMBRE: ${NOMBRE}
+      EDAD_MINIMA: ${EDAD_MINIMA}
+      PUERTO: "80"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks:
+      avance-eudi:
+        aliases: ["app-${PREFIJO}"]
+
+networks:
+  avance-eudi:
+    name: avance-eudi
+    external: true

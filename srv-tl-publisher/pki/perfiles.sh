@@ -49,7 +49,7 @@ PERFILES=(
     "pid-ds|pid|457|critical,digitalSignature|1.0.18013.5.1.2|3|Document Signer del PID (mdoc + SD-JWT VC)"
     "qeaa-ds|qeaa|457|critical,digitalSignature|1.0.18013.5.1.2|4|Document Signer del emisor QEAA"
     "qtsp-user|qtsp|825|critical,nonRepudiation||5|Certificado de firma del usuario (QES)"
-    "rp-access|rp|825|critical,digitalSignature|clientAuth|6|Access certificate de un relying party"
+    "rp-access|rp|825|critical,digitalSignature|clientAuth, 1.0.18013.5.1.6|6|Access certificate de un relying party"
     "rp-registrar|rp|825|critical,digitalSignature,nonRepudiation||7|Firma de registration certificates"
     "status-list-ds|pid|457|critical,digitalSignature||8|Firmante de las Token Status Lists"
 )

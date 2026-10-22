@@ -40,6 +40,9 @@ from cryptography.x509.oid import AuthorityInformationAccessOID, ExtendedKeyUsag
 # certificado emitido dejaría de llevar el mismo `certificatePolicies`).
 DIAS_VALIDEZ = 825
 OID_POLITICA = x509.ObjectIdentifier("2.25.224783951054833873364394138650481919266.1.6")
+# mdocReaderAuth (ISO/IEC 18013-5): el SDK de la wallet lo exige en el certificado del
+# verifier, también en OpenID4VP (ReaderTrustStore). Va junto a clientAuth.
+OID_EKU_READER_AUTH = x509.ObjectIdentifier("1.0.18013.5.1.6")
 
 MOTIVOS_VALIDOS = {
     "unspecified", "keyCompromise", "CACompromise", "affiliationChanged",
@@ -123,7 +126,7 @@ def emitir_rp_access(ca, base_url: str, csr_pem: bytes, san_dns: str | None) -> 
             ),
             critical=True,
         )
-        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=True)
+        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH, OID_EKU_READER_AUTH]), critical=True)
         .add_extension(
             x509.AuthorityInformationAccess([
                 x509.AccessDescription(

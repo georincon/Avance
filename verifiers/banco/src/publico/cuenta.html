@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mi cuenta · {{NOMBRE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap">
+<link rel="stylesheet" href="{{BASE}}/estilo.css">
+</head>
+<body>
+<header>
+  <div class="barra">
+    <a class="logo" href="{{BASE}}/">
+      <span class="marca">
+        <svg viewBox="0 0 64 46" fill="none" aria-hidden="true">
+          <g stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 40V19a9 9 0 0 1 18 0v21"/>
+            <path d="M34 8v23a9 9 0 0 0 18 0V8"/>
+          </g>
+        </svg>
+      </span>
+      {{NOMBRE}}
+    </a>
+    <div class="usuario"><span class="nombre" id="nombre-corto"></span><span id="avatar"></span><button class="salir" id="salir">Salir</button></div>
+  </div>
+</header>
+<main>
+  <div class="bienvenida" id="bienvenida" hidden>¡Tu cuenta está lista! Te regalamos un bono de bienvenida. La próxima vez entra con tu wallet, sin contraseñas.</div>
+  <h1 id="saludo">Hola</h1>
+  <div class="rejilla">
+    <div>
+      <div class="caja saldo">
+        <div class="etiqueta">Saldo disponible · Cuenta de ahorros</div>
+        <div class="valor" id="saldo">—</div>
+        <div class="cuenta"><span>N.º <strong id="numero"></strong></span><span id="desde"></span></div>
+        <div class="acciones-rapidas"><button disabled>Transferir</button><button disabled>Pagar</button><button disabled>Recargar</button></div>
+      </div>
+      <div class="caja" style="margin-top:20px">
+        <h2>Movimientos</h2>
+        <table id="movimientos"></table>
+      </div>
+    </div>
+    <div class="caja">
+      <span class="sello">✔ Verificado con tu wallet</span>
+      <h2>Tus datos</h2>
+      <img class="foto" id="foto" alt="Tu foto, del documento de la wallet" hidden>
+      <dl id="datos"></dl>
+    </div>
+  </div>
+</main>
+<footer>Banco de ejemplo para probar el ecosistema EUDI Wallet. No es un banco real.</footer>
+<script>
+  const BASE = '{{BASE}}'
+  const $ = (id) => document.getElementById(id)
+  const pesos = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
+  const fecha = (f) => f ? new Date(f).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'
+  const texto = (v) => (v ?? '—').toString()
+
+  if (new URLSearchParams(location.search).get('nueva')) { $('bienvenida').hidden = false; history.replaceState(null, '', BASE + '/cuenta') }
+
+  fetch(`${BASE}/api/yo`).then(async (r) => {
+    if (!r.ok) return (location.href = BASE + '/')
+    const c = await r.json()
+    $('saludo').textContent = `Hola, ${c.nombres.split(' ')[0]}`
+    $('nombre-corto').textContent = `${c.nombres} ${c.apellidos}`
+    // Datos que vienen del PID: siempre como texto o propiedad, nunca como HTML.
+    const avatar = document.createElement(c.foto ? 'img' : 'span')
+    if (c.foto) { avatar.src = c.foto; avatar.alt = '' } else { avatar.className = 'inicial'; avatar.textContent = c.nombres[0] }
+    $('avatar').append(avatar)
+    $('saldo').textContent = pesos(c.saldo)
+    $('numero').textContent = c.cuenta
+    $('desde').textContent = `Cliente desde ${fecha(c.creado)}`
+    $('movimientos').innerHTML = c.movimientos.slice().reverse().map((m) =>
+      `<tr><td>${m.concepto}<div class="fecha">${fecha(m.fecha)}</div></td><td class="${m.valor > 0 ? 'positivo' : ''}">${m.valor > 0 ? '+' : ''}${pesos(m.valor)}</td></tr>`).join('')
+    if (c.foto) { $('foto').src = c.foto; $('foto').hidden = false }
+    const filas = [
+      ['Documento', c.cedula],
+      ['Nombre', `${c.nombres} ${c.apellidos}`],
+      ['Nacimiento', fecha(c.fecha_nacimiento)],
+      ['Correo', c.correo],
+      ['Emitido por', c.verificacion?.emisor],
+      ['Documento vence', fecha(c.verificacion?.pid_vence)],
+      ['Verificado', fecha(c.verificacion?.fecha)],
+      ['Último ingreso', c.ultimo_ingreso ? fecha(c.ultimo_ingreso) : 'ahora'],
+    ]
+    const dl = $('datos')
+    for (const [k, v] of filas) {
+      // Este PID no trae correo ni vencimiento: no se muestra una fila vacía.
+      if ((k === 'Correo' || k === 'Documento vence') && !texto(v).replace(/[—-]/g, '').trim()) continue
+      const dt = document.createElement('dt'); dt.textContent = k
+      const dd = document.createElement('dd'); dd.textContent = texto(v)
+      dl.append(dt, dd)
+    }
+  })
+
+  $('salir').onclick = async () => { await fetch(`${BASE}/api/salir`, { method: 'POST' }); location.href = BASE + '/' }
+</script>
+</body>
+</html>

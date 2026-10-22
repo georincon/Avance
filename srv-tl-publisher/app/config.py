@@ -96,6 +96,11 @@ CLAVE_OPERADOR = os.getenv("TL_OPERATOR_KEY", "")
 PKI_EMITIR_URL = os.getenv("PKI_ISSUE_URL", "http://tl-publisher-pki:8080/issue/rp-access")
 PKI_EMITIR_KEY = os.getenv("PKI_ISSUE_API_KEY", "")
 
+# Donde los verifiers preguntan por la confianza de un emisor. Es lo que `integracion.py`
+# entrega en verifier.env. Es la URL PUBLICA del dominio y no `http://trust-validator:8080`:
+# el verifier-api de cada instancia no se une a la red avance-eudi (ver verifiers/_comun/compose.yml).
+TRUST_VALIDATOR_URL = os.getenv("TRUST_VALIDATOR_URL", f"{BASE_URL}/trust")
+
 # ─── Metadatos del esquema ───────────────────────────────────────────────────
 
 TERRITORIO = os.getenv("SCHEME_TERRITORY", "CO")

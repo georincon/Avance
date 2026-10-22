@@ -96,6 +96,21 @@ ROL_POR_TIPO = {
     "http://uri.etsi.org/Svc/Svctype/CA/QC": "qtsp",
 }
 
+def _direccion_postal_tsp(pais) -> str:
+    """Direccion postal del proveedor con la forma que lee `generador.py`.
+
+    El generador espera `{lang, StreetAddress, Locality, CountryName}` y los URIs como `{lang, URI}`:
+    escribirlos como `{lang, text}` deja elementos `URI` vacios y la TSL no valida contra el XSD.
+    """
+    return json.dumps([{"lang": "en", "StreetAddress": "-", "Locality": "-",
+                        "CountryName": (pais or "CO")[:2].upper()}])
+
+
+def _uri_multilang(url) -> str:
+    """Un URI multiidioma con la forma `{lang, URI}` (si no hay URL, la del dominio publico)."""
+    return json.dumps([{"lang": "en", "URI": url or config.BASE_URL}])
+
+
 ESTADO_ACTIVO = "activo"
 ESTADO_RETIRADO = "retirado"
 
@@ -455,18 +470,19 @@ def sincronizar(con) -> None:
             except Exception:
                 continue
             der = cert_obj.public_bytes(serialization.Encoding.DER)
-            ident = {"X509Certificate": base64.b64encode(der).decode()}
+            # TS 119 612: cada DigitalId lleva UN solo elemento (certificado, nombre o SKI).
+            # Juntarlos en uno no valida contra el XSD (es lo que hace `sembrar.py` bien).
+            identidades.append({"X509Certificate": base64.b64encode(der).decode()})
             try:
-                ident["X509SubjectName"] = cert_obj.subject.rfc4514_string()
+                identidades.append({"X509SubjectName": cert_obj.subject.rfc4514_string()})
             except Exception:
                 pass
             try:
                 ski = cert_obj.extensions.get_extension_for_class(
                     x509.SubjectKeyIdentifier).value.digest
-                ident["X509SKI"] = base64.b64encode(ski).decode()
+                identidades.append({"X509SKI": base64.b64encode(ski).decode()})
             except x509.ExtensionNotFound:
                 pass
-            identidades.append(ident)
 
         with con.cursor() as c:
             c.execute(
@@ -543,9 +559,9 @@ def crear_actor(cuerpo: ActorBody, x_api_key: str = Header(default=None)):
                 (
                     json.dumps([{"lang": "en", "text": cuerpo.nombre}]),
                     json.dumps([{"lang": "en", "text": cuerpo.nombre}]),
-                    json.dumps([{"lang": "en", "text": cuerpo.nombre}]),
-                    json.dumps([{"lang": "en", "text": cuerpo.url_info or cuerpo.nombre}]),
-                    json.dumps([{"lang": "en", "text": cuerpo.url_info or cuerpo.nombre}]),
+                    _direccion_postal_tsp(cuerpo.pais),
+                    _uri_multilang(cuerpo.url_info),
+                    _uri_multilang(cuerpo.url_info),
                     _operador(con),
                 ),
             )
@@ -562,7 +578,7 @@ def crear_actor(cuerpo: ActorBody, x_api_key: str = Header(default=None)):
                     "http://uri.etsi.org/TrstSvc/TrustedList/Svcstatus/granted",
                     _ahora(),
                     json.dumps([{"lang": "en", "text": cuerpo.nombre}]),
-                    json.dumps([{"lang": "en", "text": f"{config.BASE_URL}/pki/cps"}]),
+                    _uri_multilang(f"{config.BASE_URL}/pki/cps"),
                     _operador(con),
                     tsp_id,
                 ),
@@ -720,6 +736,12 @@ def guardar_puntos(actor_id: int, cuerpo: PuntosBody,
 def comprobar_emisor(url: str, x_api_key: str = Header(default=None)):
     """Consulta la metadata de un emisor para ver que emite."""
     _clave(x_api_key)
+    return leer_emisor(url)
+
+
+def leer_emisor(url: str) -> dict:
+    """Lee la metadata OpenID4VCI de un emisor (sin autenticacion: la usa tambien
+    `integracion.py` para armar las clases de documentos del verifier)."""
     if not url.startswith("http"):
         raise HTTPException(400, "La URL debe empezar por http.")
     import urllib.request
@@ -755,7 +777,8 @@ def comprobar_emisor(url: str, x_api_key: str = Header(default=None)):
                     "id": clave,
                     "nombre": valor.get("name") or valor.get("display") or clave,
                     "formato": valor.get("format") or "",
-                    "tipo": valor.get("vct") or "",
+                    # SD-JWT VC: vct; mdoc: doctype
+                    "tipo": valor.get("vct") or valor.get("doctype") or "",
                 })
             else:
                 configuraciones.append({"id": clave, "nombre": clave,
@@ -843,9 +866,9 @@ def registrar_verifier(cuerpo: VerifierBody, x_api_key: str = Header(default=Non
                 (
                     json.dumps([{"lang": "en", "text": cuerpo.nombre}]),
                     json.dumps([{"lang": "en", "text": cuerpo.nombre}]),
-                    json.dumps([{"lang": "en", "text": cuerpo.nombre}]),
-                    json.dumps([{"lang": "en", "text": cuerpo.nombre}]),
-                    json.dumps([{"lang": "en", "text": cuerpo.nombre}]),
+                    _direccion_postal_tsp(cuerpo.pais),
+                    _uri_multilang((cuerpo.dominios or [None])[0] and f"https://{cuerpo.dominios[0]}"),
+                    _uri_multilang((cuerpo.dominios or [None])[0] and f"https://{cuerpo.dominios[0]}"),
                     _operador(con),
                 ),
             )
@@ -862,7 +885,7 @@ def registrar_verifier(cuerpo: VerifierBody, x_api_key: str = Header(default=Non
                     "http://uri.etsi.org/TrstSvc/TrustedList/Svcstatus/granted",
                     _ahora(),
                     json.dumps([{"lang": "en", "text": cuerpo.nombre}]),
-                    json.dumps([{"lang": "en", "text": f"{config.BASE_URL}/pki/cps"}]),
+                    _uri_multilang(f"{config.BASE_URL}/pki/cps"),
                     _operador(con),
                     tsp_id,
                 ),
@@ -876,7 +899,9 @@ def registrar_verifier(cuerpo: VerifierBody, x_api_key: str = Header(default=Non
                 (service_id, service_id, cuerpo.nombre, cuerpo.pais,
                  (cuerpo.dominios or [None])[0], _ahora()),
             )
-            actor_id = c.lastrowid
+            # actor_id se inserto explicito (= service_id): lastrowid devolveria 0 y el
+            # certificado quedaria colgado de un actor que no existe.
+            actor_id = service_id
             info = _info_cert(cert)
             c.execute(
                 """INSERT INTO admin_certificados

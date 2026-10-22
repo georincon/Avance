@@ -1,0 +1,96 @@
+{
+ "https://civica-desarrollo.avance.org.co/pid-registraduria": {
+  "configuraciones": [
+   {
+    "id": "eu.europa.ec.eudi.pid_mso_mdoc",
+    "nombre": "eu.europa.ec.eudi.pid_mso_mdoc",
+    "formato": "mso_mdoc",
+    "tipo": "eu.europa.ec.eudi.pid.1"
+   },
+   {
+    "id": "eu.europa.ec.eudi.pid_mso_mdoc_deferred",
+    "nombre": "eu.europa.ec.eudi.pid_mso_mdoc_deferred",
+    "formato": "mso_mdoc",
+    "tipo": "eu.europa.ec.eudi.pid.1"
+   },
+   {
+    "id": "eu.europa.ec.eudi.pid_vc_sd_jwt",
+    "nombre": "eu.europa.ec.eudi.pid_vc_sd_jwt",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:eudi:pid:1"
+   },
+   {
+    "id": "eu.europa.ec.eudi.pid_vc_sd_jwt_deferred",
+    "nombre": "eu.europa.ec.eudi.pid_vc_sd_jwt_deferred",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:eudi:pid:1"
+   }
+  ],
+  "leido": "2026-10-22T13:39:46+00:00"
+ },
+ "https://civica-desarrollo.avance.org.co/uis-issuer": {
+  "configuraciones": [
+   {
+    "id": "eu.europa.ec.eudi.pid_mso_mdoc",
+    "nombre": "eu.europa.ec.eudi.pid_mso_mdoc",
+    "formato": "mso_mdoc",
+    "tipo": "eu.europa.ec.eudi.pid.1"
+   },
+   {
+    "id": "eu.europa.ec.eudi.pid_mso_mdoc_deferred",
+    "nombre": "eu.europa.ec.eudi.pid_mso_mdoc_deferred",
+    "formato": "mso_mdoc",
+    "tipo": "eu.europa.ec.eudi.pid.1"
+   },
+   {
+    "id": "eu.europa.ec.eudi.pid_vc_sd_jwt",
+    "nombre": "eu.europa.ec.eudi.pid_vc_sd_jwt",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:eudi:pid:1"
+   },
+   {
+    "id": "eu.europa.ec.eudi.pid_vc_sd_jwt_deferred",
+    "nombre": "eu.europa.ec.eudi.pid_vc_sd_jwt_deferred",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:eudi:pid:1"
+   },
+   {
+    "id": "org.iso.18013.5.1.mDL",
+    "nombre": "org.iso.18013.5.1.mDL",
+    "formato": "mso_mdoc",
+    "tipo": "org.iso.18013.5.1.mDL"
+   },
+   {
+    "id": "org.iso.18013.5.1.mDL_deferred",
+    "nombre": "org.iso.18013.5.1.mDL_deferred",
+    "formato": "mso_mdoc",
+    "tipo": "org.iso.18013.5.1.mDL"
+   },
+   {
+    "id": "urn:eu.europa.ec.eudi:learning:credential:1:dc+sd-jwt-compact",
+    "nombre": "urn:eu.europa.ec.eudi:learning:credential:1:dc+sd-jwt-compact",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:eu.europa.ec.eudi:learning:credential:1"
+   },
+   {
+    "id": "urn:eu.europa.ec.eudi:learning:credential:1:dc+sd-jwt-compact_deferred",
+    "nombre": "urn:eu.europa.ec.eudi:learning:credential:1:dc+sd-jwt-compact_deferred",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:eu.europa.ec.eudi:learning:credential:1"
+   },
+   {
+    "id": "urn:eudi:academic:credential:1:dc+sd-jwt",
+    "nombre": "urn:eudi:academic:credential:1:dc+sd-jwt",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:eudi:academic:credential:1"
+   },
+   {
+    "id": "urn:eudi:academic:credential:1:dc+sd-jwt_deferred",
+    "nombre": "urn:eudi:academic:credential:1:dc+sd-jwt_deferred",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:eudi:academic:credential:1"
+   }
+  ],
+  "leido": "2026-10-22T15:12:02+00:00"
+ }
+}

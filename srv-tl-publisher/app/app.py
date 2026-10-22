@@ -18,7 +18,7 @@ import re
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 import admin
@@ -27,6 +27,7 @@ import bd
 import config
 import definiciones
 import espejo
+import integracion
 import publicacion
 
 logging.basicConfig(level=logging.INFO,
@@ -125,6 +126,12 @@ def listas():
                 url=f"{config.BASE_URL}/TL/{e['scheme_slug']}/current.xml",
             ))
     return salida
+
+
+@app.get("/tl-api/v1/integracion/verifier.env", response_class=PlainTextResponse)
+def integracion_verifier():
+    """Variables del verifier oficial: trust-validator y clases de documentos (publico)."""
+    return integracion.verifier_env()
 
 
 @app.get("/TL/{esquema}/current.xml")
