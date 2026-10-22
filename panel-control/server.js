@@ -51,8 +51,11 @@ const entries = [
   verifierApp('banco', 'Verifier Banco', 'Banco Cívica: ingreso y apertura de cuenta presentando el PID', 'bank'),
   verifierApp('contratacion', 'Verifier Contratación', 'Contratación: comprueba la formación académica de una persona candidata', 'briefcase'),
   verifierApp('discoteca', 'Verifier Discoteca', 'Discoteca: comprueba la mayoría de edad sin guardar ningún dato', 'nightlife'),
-  verifierApp('notaria', 'Notaría', 'Notaría de ejemplo: verifica el PID y emite documentos notariales a la wallet', 'notary'),
-  verifierApp('eps', 'Verifier EPS', 'EPS: afiliación y portal médico con la wallet', 'health'),
+  verifierApp('notaria', 'Notaría', 'Notaría de ejemplo: verifica el PID y emite 6 documentos notariales (poder, fe de vida, autenticación de firma, permiso de menor…)', 'notary'),
+  verifierApp('eps', 'Verifier EPS', 'EPS: carné de afiliado e historia clínica con la wallet; portal médico', 'health'),
+  verifierApp('aerolinea', 'Aerolínea (Páramo Air)', 'Aerolínea de ejemplo: verifica nombre, documento, edad y foto, vende el pasaje y emite el tiquete a la wallet', 'plane'),
+  verifierApp('acceso', 'Verifier Control de acceso', 'Portería: foto, nombre y documento del PID para que un guardia decida el ingreso', 'shield-check'),
+  verifierApp('beca', 'Verifier Inscripción y becas', 'Admisiones y becas: pre-evalúa con PID + credencial académica sin saber quién es la persona', 'school'),
   { id:'trust-validator', name:'Trust Validator', group:'Servicios de confianza', folder:'eudi-srv-trust-validator/docker-compose', compose:'docker-compose.yaml', url:'/trust-validator/actuator/health', icon:'shield', description:'Validador de confianza (LoTE/TSL)', containers:['trust-validator'], services:['trust-validator'] },
   { id:'tl-publisher', name:'Publicador de listas', group:'Servicios de confianza', folder:'srv-tl-publisher/docker-compose', compose:'docker-compose.yaml', url:'/tl-publisher/tl-api/v1/lists', icon:'shield', description:'Publica las Trusted Lists locales (ETSI TS 119 612)', containers:['tl-publisher','tl-publisher-pki','tlp-db'], services:['tl-publisher','pki','tlp-db'] },
   { id:'proxy-nginx', name:'Proxy Nginx (único)', group:'Gateway', folder:'srv-nw-nginx/docker-compose', compose:'docker-compose.yaml', url:'/', icon:'globe', description:'Punto de entrada único del ecosistema', service:'nw-nginx', isProxy:true, alwaysUp:true, containers:['nw-nginx','nw-certbot-renew'], services:['nw-nginx','certbot-renew'] }

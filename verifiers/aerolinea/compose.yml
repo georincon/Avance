@@ -1,0 +1,35 @@
+# La aerolínea de ejemplo. Cuelga directamente de la red compartida "avance-eudi" con el
+# alias app-PREFIJO: el nginx central le pasa con la ruta completa tanto
+# https://DOMINIO/PREFIJO/… como https://DOMINIO/.well-known/<x>/PREFIJO (la
+# metadata del emisor). Habla con su verifier (../_comun, instancia
+# VERIFIER_INSTANCIA) por la misma red.
+#
+# Se usa con ./levantar.sh o, ya creada: docker compose -p aerolinea --env-file .env logs -f
+name: aerolinea
+
+services:
+  aerolinea:
+    build: .
+    restart: unless-stopped
+    # El dueño de ./datos y ./secretos (quien ejecutó levantar.sh).
+    user: ${UID_GID:-1000:1000}
+    environment:
+      URL_PUBLICA: https://${DOMINIO}/${PREFIJO}
+      VERIFIER_API: http://verifier-${VERIFIER_INSTANCIA}/verifier-${VERIFIER_INSTANCIA}
+      TRUST_VALIDATOR_URL: ${TRUST_VALIDATOR_URL}
+      AEROLINEA_NOMBRE: ${AEROLINEA_NOMBRE}
+      AEROLINEA_CODIGO: ${AEROLINEA_CODIGO}
+      SECRETOS_DIR: /secretos
+      TRAMITES_ARCHIVO: /datos/tramites.json
+      PUERTO: "80"
+    volumes:
+      - ./datos:/datos
+      - ./secretos:/secretos:ro
+    networks:
+      avance-eudi:
+        aliases: ["app-${PREFIJO}"]
+
+networks:
+  avance-eudi:
+    name: avance-eudi
+    external: true

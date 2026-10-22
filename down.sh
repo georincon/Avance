@@ -17,8 +17,16 @@
 # contenedor parado tambien es un resto, y `down` se lo lleva igual.
 #
 # La red compartida 'avance-eudi' NO se borra: no pertenece a ningun proyecto.
+#
+# Los portales de verifiers/ se bajan primero (verifiers/bajar-portales.sh): son dos proyectos por portal
+# (la app y su verifier) y no estan en el compose raiz.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
+
+# 0) Los portales de ejemplo de verifiers/ (cada app y su verifier). No siguen la convencion
+#    <proyecto>/docker-compose/, asi que el recorrido de abajo no los vería.
+echo ">> Bajando los portales de ejemplo..."
+verifiers/bajar-portales.sh "$@" || true
 
 # 1) Lo que este bajo el proyecto de la raiz.
 echo ">> Bajando el ecosistema (proyecto raiz)..."

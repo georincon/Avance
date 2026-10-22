@@ -10,6 +10,11 @@ Las fuentes son las del corpus del repositorio (`docs/corpus-eudi`): ARF y sus t
 | Discoteca (`/discoteca`) | PID (Registraduría) | Verificación de edad: solo `age_equal_or_over.18`, sin guardar nada |
 | Banco (`/banco`) | PID | Ingreso y apertura de cuenta sin contraseña |
 | Contratación (`/contratacion`) | Académica (UIS) | Formación por nivel, solo graduados; identidad aparte y opcional |
+| EPS (`/eps`) | Carné e historia clínica (QEAA, emitidos por la EPS) | Afiliación y portal médico |
+| Notaría (`/notaria`) | PID; emite 6 actos (PuB-EAA) | Poder, declaración, reconocimiento, fe de vida, autenticación de firma, permiso de menor |
+| Inscripción y becas (`/beca`) | PID + académica (presentación combinada) | Pre-evaluación sin identidad; identidad solo si cumple |
+| Aerolínea (`/aerolinea`) | PID (nombre, documento, fecha de nacimiento, foto); emite el tiquete (QEAA) | Venta de pasajes y embarque con tiquete + PID en una presentación |
+| Control de acceso (`/acceso`) | PID | Foto, nombre y documento mostrados al guardia, que decide; sin guardar la foto |
 
 ## Casos reales de la UE y cómo se simulan
 

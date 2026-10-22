@@ -28,7 +28,7 @@ quiere ver.
 | Wallet Provider (único) | `eudi-srv-wallet-provider` | `/wallet-provider` |
 | Onboarding | `srv-onboarding` | `/onboarding` |
 | Ancla de la app Android | `app-new-wallet` | (no tiene ruta: no es web) |
-| Verifiers (banco, contratación, discoteca, EPS) | `verifiers/<nombre>` + su verifier en `verifiers/_comun` | `/<nombre>/` |
+| Verifiers y portales (banco, contratación, discoteca, EPS, notaría, inscripción y becas, control de acceso, aerolínea) | `verifiers/<nombre>` + su verifier en `verifiers/_comun` | `/<nombre>/` |
 | Validador de confianza | `eudi-srv-trust-validator` | `/trust-validator` |
 | Publicador de listas | `srv-tl-publisher` | `/tl-publisher` |
 | Proxy Nginx (único) | `srv-nw-nginx` | (todo) |

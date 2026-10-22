@@ -1,0 +1,28 @@
+# Portal de admisiones y becas (verificación combinada: PID + credencial académica). Se une a la red compartida "avance-eudi" con el alias
+# app-beca (srv-nw-nginx le pasa /beca/… con la ruta completa) y habla con su verifier
+# (../_comun, instancia VERIFIER_INSTANCIA) por la misma red, usando el alias de su haproxy.
+# Sin volúmenes: no guarda nada.
+#
+#   ./levantar.sh, o ya creado: docker compose -p beca --env-file .env logs -f
+name: beca
+
+services:
+  beca:
+    build: .
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      URL_PUBLICA: https://${DOMINIO}/${PREFIJO}
+      VERIFIER_API: http://verifier-${VERIFIER_INSTANCIA}/verifier-${VERIFIER_INSTANCIA}
+      NOMBRE_ENTIDAD: ${NOMBRE_ENTIDAD}
+      PUERTO: "80"
+    networks:
+      avance-eudi:
+        aliases: ["app-${PREFIJO}"]
+
+networks:
+  avance-eudi:
+    name: avance-eudi
+    external: true

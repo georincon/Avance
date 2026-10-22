@@ -1,0 +1,28 @@
+# Portal de control de acceso (portería: foto, nombre y documento del PID). Se une a la red compartida "avance-eudi" con el alias
+# app-acceso (srv-nw-nginx le pasa /acceso/… con la ruta completa) y habla con su verifier
+# (../_comun, instancia VERIFIER_INSTANCIA) por la misma red, usando el alias de su haproxy.
+# Sin volúmenes: no guarda nada.
+#
+#   ./levantar.sh, o ya creado: docker compose -p acceso --env-file .env logs -f
+name: acceso
+
+services:
+  acceso:
+    build: .
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      URL_PUBLICA: https://${DOMINIO}/${PREFIJO}
+      VERIFIER_API: http://verifier-${VERIFIER_INSTANCIA}/verifier-${VERIFIER_INSTANCIA}
+      NOMBRE_ENTIDAD: ${NOMBRE_ENTIDAD}
+      PUERTO: "80"
+    networks:
+      avance-eudi:
+        aliases: ["app-${PREFIJO}"]
+
+networks:
+  avance-eudi:
+    name: avance-eudi
+    external: true

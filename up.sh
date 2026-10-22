@@ -4,6 +4,7 @@
 #
 #   ./up.sh            levanta el ecosistema entero (los 10 stacks, UIS incluido)
 #   ./up.sh --sin-uis  levanta solo los 9 stacks del compose raiz (sin el issuer UIS)
+#   ./up.sh --sin-portales   no levanta los portales de ejemplo de verifiers/
 #   ./up.sh --build    reconstruye las imagenes antes de levantar
 #   ./up.sh --help     esta ayuda
 #
@@ -20,6 +21,11 @@
 #
 # Este script levanta LOS DOS: primero el compose raiz y despues el stack de la
 # UIS con su propio compose. Con --sin-uis se queda solo con el compose raiz.
+#
+# Despues levanta los portales de ejemplo de verifiers/ (discoteca, banco, contratacion,
+# EPS, notaria, aerolinea, inscripcion y becas, control de acceso), cada uno con su
+# verifier: lo hace verifiers/levantar-portales.sh. Un portal que nunca se creo no se
+# crea aqui (su levantar.sh lo hace la primera vez). Con --sin-portales se omiten.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
@@ -47,6 +53,7 @@ REDES_UIS=(
 
 # Los argumentos. Los que son de este script se separa de los de Compose.
 CON_UIS=1
+CON_PORTALES=1
 BUILD=()
 AYUDA=0
 ARGUMENTOS_COMPOSE=()
@@ -54,6 +61,7 @@ ARGUMENTOS_COMPOSE=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --sin-uis|--no-uis) CON_UIS=0 ;;
+    --sin-portales)      CON_PORTALES=0 ;;
     --build)             BUILD=(--build) ;;
     -h|--help)           AYUDA=1 ;;
     *)                   ARGUMENTOS_COMPOSE+=("$1") ;;
@@ -90,6 +98,13 @@ if [ "$CON_UIS" -eq 1 ]; then
     up -d "${BUILD[@]}" "${ARGUMENTOS_COMPOSE[@]}"
 fi
 
+# Los portales de ejemplo, cada uno con su verifier. Van despues: necesitan la red
+# compartida y, para verificar, los emisores y las listas de estado.
+if [ "$CON_PORTALES" -eq 1 ]; then
+  echo ">> Levantando los portales de ejemplo..."
+  verifiers/levantar-portales.sh "${BUILD[@]}" || echo "   (algun portal no subio: ver arriba)"
+fi
+
 # Que se vea.
 echo
 docker compose ps --format "table {{.Service}}\t{{.Status}}"
@@ -102,6 +117,9 @@ fi
 echo
 echo "Ecosistema disponible en https://civica-desarrollo.avance.org.co"
 echo "El panel de control, en la raiz del dominio."
+if [ "$CON_PORTALES" -eq 1 ]; then
+  echo "Portales: /discoteca /banco /contratacion /eps /notaria /aerolinea /beca /acceso"
+fi
 if [ "$CON_UIS" -eq 0 ]; then
   echo "El issuer de la UIS queda fuera; para levantarlo:"
   echo "  docker compose -f eudi-srv-issuer-pid-uis/docker-compose/docker-compose.yaml up -d"

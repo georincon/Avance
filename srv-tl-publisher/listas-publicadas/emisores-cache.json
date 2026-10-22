@@ -26,7 +26,7 @@
     "tipo": "urn:eudi:pid:1"
    }
   ],
-  "leido": "2026-10-22T19:38:27+00:00"
+  "leido": "2026-10-22T21:36:56+00:00"
  },
  "https://civica-desarrollo.avance.org.co/uis-issuer": {
   "configuraciones": [
@@ -108,7 +108,7 @@
     "tipo": "urn:co:eps:resumen-historia-clinica:1"
    }
   ],
-  "leido": "2026-10-22T19:38:27+00:00"
+  "leido": "2026-10-22T21:36:56+00:00"
  },
  "https://civica-desarrollo.avance.org.co/notaria": {
   "configuraciones": [
@@ -149,6 +149,17 @@
     "tipo": "urn:co:notaria:permiso-salida-menor:1"
    }
   ],
-  "leido": "2026-10-22T19:38:27+00:00"
+  "leido": "2026-10-22T21:36:56+00:00"
+ },
+ "https://civica-desarrollo.avance.org.co/aerolinea": {
+  "configuraciones": [
+   {
+    "id": "co.aerolinea.tiquete",
+    "nombre": "co.aerolinea.tiquete",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:aerolinea:tiquete:1"
+   }
+  ],
+  "leido": "2026-10-22T21:36:56+00:00"
  }
 }
