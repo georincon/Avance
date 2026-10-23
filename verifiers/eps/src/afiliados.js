@@ -57,6 +57,18 @@ export function crearAfiliados(archivo, semilla) {
       return a
     },
 
+    /** Añade un beneficiario (compañero(a) permanente) al afiliado, con la declaración que lo respalda. */
+    agregarBeneficiario(documento, b) {
+      const p = leer()
+      const a = p.afiliados.find((x) => x.documento === documento)
+      if (!a) return null
+      a.beneficiarios ??= []
+      if (a.beneficiarios.some((x) => x.documento === b.documento)) return { ya: true }
+      a.beneficiarios.push({ ...b, desde: new Date().toISOString().slice(0, 10) })
+      guardar(p)
+      return a
+    },
+
     /** El médico actualiza la historia: sube la versión y las entregadas antes quedan reemplazadas. */
     actualizarHistoria(documento, cambios, medico) {
       const p = leer()

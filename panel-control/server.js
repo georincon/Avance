@@ -49,14 +49,23 @@ const entries = [
   // instancia <n>). No estan en el compose raiz, asi que se manejan con `stacks`, igual que la
   // UIS tiene su propio compose. El orden importa: el verifier va primero.
   verifierApp('banco', 'Verifier Banco', 'Banco Cívica: ingreso y apertura de cuenta presentando el PID', 'bank'),
-  verifierApp('contratacion', 'Verifier Contratación', 'Contratación: comprueba la formación académica de una persona candidata', 'briefcase'),
+  verifierApp('contratacion', 'Verifier Contratación', 'Contratación: comprueba la formación académica de una persona candidata y le hace firmar el contrato de trabajo desde su wallet', 'briefcase'),
   verifierApp('discoteca', 'Verifier Discoteca', 'Discoteca: comprueba la mayoría de edad sin guardar ningún dato', 'nightlife'),
   verifierApp('notaria', 'Notaría', 'Notaría de ejemplo: verifica el PID y emite 6 documentos notariales (poder, fe de vida, autenticación de firma, permiso de menor…)', 'notary'),
   verifierApp('eps', 'Verifier EPS', 'EPS: carné de afiliado e historia clínica con la wallet; portal médico', 'health'),
   verifierApp('aerolinea', 'Aerolínea (Páramo Air)', 'Aerolínea de ejemplo: verifica nombre, documento, edad y foto, vende el pasaje y emite el tiquete a la wallet', 'plane'),
   verifierApp('acceso', 'Verifier Control de acceso', 'Portería: foto, nombre y documento del PID para que un guardia decida el ingreso', 'shield-check'),
+  verifierApp('pensiones', 'Verifier Fondo de pensiones', 'Prueba de supervivencia: acepta la fe de vida notarial y la cruza con el PID', 'health'),
+  verifierApp('cancilleria', 'Verifier Cancillería', 'Pasaportes: identifica con el PID y emite el pasaporte digital (PuB-EAA)', 'globe'),
   verifierApp('beca', 'Verifier Inscripción y becas', 'Admisiones y becas: pre-evalúa con PID + credencial académica sin saber quién es la persona', 'school'),
   { id:'trust-validator', name:'Trust Validator', group:'Servicios de confianza', folder:'eudi-srv-trust-validator/docker-compose', compose:'docker-compose.yaml', url:'/trust-validator/actuator/health', icon:'shield', description:'Validador de confianza (LoTE/TSL)', containers:['trust-validator'], services:['trust-validator'] },
+  // Simulador del prestador de firma remota (estilo Andes SCD): API CSC v2, certificados de firma de la
+  // sub-CA QTSP y sellado de tiempo. Un solo proyecto de Compose con su .env, como las apps de verifiers/.
+  { id:'andes-scd', name:'Servicio de firma (Andes SCD)', group:'Servicios de confianza', folder:'srv-andes-scd', compose:'compose.yml', url:'/andes-scd/', icon:'shield', description:'Simulador del prestador de firma remota: identifica con el PID, emite certificados de firma (sub-CA QTSP), firma (CSC v2) y sella el tiempo', levantar:'srv-andes-scd/levantar.sh', containers:['andes-scd','verifier-firma-haproxy-1','verifier-firma-verifier-api-1','verifier-firma-verifier-web-1'], stacks:[
+    // Primero su verifier (identifica al firmante con el PID); `down` los recorre al revés.
+    { project:'verifier-firma', dir:'verifiers/_comun', file:'compose.yml', env:'instancias/firma/.env' },
+    { project:'andes-scd', dir:'srv-andes-scd', file:'compose.yml', env:'.env' },
+  ] },
   { id:'tl-publisher', name:'Publicador de listas', group:'Servicios de confianza', folder:'srv-tl-publisher/docker-compose', compose:'docker-compose.yaml', url:'/tl-publisher/tl-api/v1/lists', icon:'shield', description:'Publica las Trusted Lists locales (ETSI TS 119 612)', containers:['tl-publisher','tl-publisher-pki','tlp-db'], services:['tl-publisher','pki','tlp-db'] },
   { id:'proxy-nginx', name:'Proxy Nginx (único)', group:'Gateway', folder:'srv-nw-nginx/docker-compose', compose:'docker-compose.yaml', url:'/', icon:'globe', description:'Punto de entrada único del ecosistema', service:'nw-nginx', isProxy:true, alwaysUp:true, containers:['nw-nginx','nw-certbot-renew'], services:['nw-nginx','certbot-renew'] }
 ];
@@ -247,7 +256,7 @@ async function accionStacks(project, action) {
     try {
       await access(env);
     } catch {
-      throw new Error('Falta ' + path.relative(root, env) + ': se crea la primera vez con verifiers/' + project.id.slice(9) + '/levantar.sh.');
+      throw new Error('Falta ' + path.relative(root, env) + ': se crea la primera vez con ' + (project.levantar || 'verifiers/' + project.id.slice(9) + '/levantar.sh') + '.');
     }
     const base = ['compose', '-p', stack.project, '--env-file', env, '-f', path.resolve(cwd, stack.file)];
     if (action === 'up') {
@@ -326,6 +335,174 @@ async function accionGlobal(action) {
   return {action, results, ok:results.every((item) => item.ok)};
 }
 
+/**
+ * RECURSOS: todo lo que Docker tiene del ecosistema, en una sola foto.
+ *
+ * Es el `docker ps` mejorado de la vista "Recursos": contenedores (con su tarjeta del panel, host, puertos,
+ * tiempo de actividad y salud), redes y volúmenes. Se pregunta por `docker inspect` de todos los ids de una vez.
+ *
+ * Los cambios llegan por `docker events`: el servidor lo escucha una sola vez, espera 400 ms a que se calme la
+ * ráfaga (un `up` genera decenas de eventos) y manda la foto nueva a cada navegador abierto.
+ */
+const tarjetaDe = new Map(entries.flatMap((item) => (item.containers || []).map((nombre) => [nombre, item])));
+tarjetaDe.set('avance-control-panel', { id:'panel-control', name:'Panel de control', group:'Panel', url:'/' });
+
+function puertos(contenedor) {
+  const publicados = [];
+  const enlazados = contenedor.HostConfig?.PortBindings || {};
+  for (const [clave, enlaces] of Object.entries(enlazados)) {
+    const [interno, protocolo] = clave.split('/');
+    for (const enlace of enlaces || []) {
+      const ip = enlace.HostIp && enlace.HostIp !== '0.0.0.0' && enlace.HostIp !== '::' ? enlace.HostIp : '';
+      publicados.push({ ip, host:enlace.HostPort || '', interno, protocolo:protocolo || 'tcp' });
+    }
+  }
+  const publicadosInternos = new Set(publicados.map((p) => `${p.interno}/${p.protocolo}`));
+  const expuestos = Object.keys(contenedor.Config?.ExposedPorts || contenedor.NetworkSettings?.Ports || {});
+  const internos = [...new Set(expuestos.filter((p) => !publicadosInternos.has(p)).map((p) => p.replace(/\/tcp$/, '')))];
+  const dedup = [...new Map(publicados.map((p) => [`${p.ip}|${p.host}|${p.interno}|${p.protocolo}`, p])).values()];
+  return { publicados:dedup, internos };
+}
+
+const MOTORES = [[/postgres/i, 'PostgreSQL', 5432], [/mysql/i, 'MySQL', 3306], [/mariadb/i, 'MariaDB', 3306], [/mongo/i, 'MongoDB', 27017], [/redis/i, 'Redis', 6379]];
+/** Si el contenedor es una base de datos: motor, base y usuario (nunca la contraseña). */
+function datosBase(contenedor, publicados) {
+  const imagen = contenedor.Config?.Image || '';
+  const motor = MOTORES.find(([patron]) => patron.test(imagen.split('/').pop()));
+  if (!motor) return null;
+  const entorno = Object.fromEntries((contenedor.Config?.Env || []).map((linea) => { const k = linea.indexOf('='); return [linea.slice(0, k), linea.slice(k + 1)]; }));
+  const base = entorno.POSTGRES_DB || entorno.MYSQL_DATABASE || entorno.MONGO_INITDB_DATABASE || '';
+  const usuario = entorno.POSTGRES_USER || entorno.MYSQL_USER || entorno.MONGO_INITDB_ROOT_USERNAME || '';
+  const interno = String(motor[2]);
+  const publicado = publicados.find((p) => p.interno === interno);
+  const esquema = motor[1] === 'PostgreSQL' ? 'postgresql' : motor[1] === 'MySQL' ? 'mysql' : motor[1] === 'MariaDB' ? 'mariadb' : '';
+  return {
+    motor:motor[1], base, usuario, puertoInterno:interno, puertoLocal:publicado?.host || '', ipLocal:publicado ? (publicado.ip || '127.0.0.1') : '',
+    jdbc:publicado && esquema ? `jdbc:${esquema}://${publicado.ip || '127.0.0.1'}:${publicado.host}/${base}` : '',
+  };
+}
+
+/** A qué parte del ecosistema pertenece: Issuer, Verifier, Portal, Base de datos, Wallet… */
+function tipoDe(nombre, tarjeta, base) {
+  if (base) return 'Base de datos';
+  const id = tarjeta?.id || '';
+  if (id.startsWith('issuer-')) return 'Issuer';
+  if (id === 'wallet-provider' || id === 'app-new-wallet') return 'Wallet';
+  if (id === 'onboarding') return 'Onboarding';
+  if (id === 'trust-validator' || id === 'tl-publisher' || id === 'andes-scd') return 'Confianza';
+  if (id === 'proxy-nginx') return 'Gateway';
+  if (id === 'panel-control') return 'Panel';
+  if (id.startsWith('verifier-')) return nombre.startsWith('verifier-') ? 'Verifier' : 'Portal';
+  if (nombre.includes('verifier')) return 'Verifier';
+  return 'Otro';
+}
+
+
+/**
+ * Enlaces de cada contenedor, para la última columna de «Recursos».
+ *
+ * Son rutas del proxy único (relativas: se abren en el mismo origen desde el que se abre el panel). Solo se
+ * listan páginas que responden. Lo que no tiene página propia (una base de datos, una lista de estado) cae al
+ * enlace del proyecto al que pertenece.
+ */
+const L = (texto, url) => ({ texto, url });
+const ENLACES_FIJOS = {
+  'haproxy-reg': [L('Emisor PID', '/pid-registraduria/'), L('Metadatos', '/pid-registraduria/.well-known/openid-credential-issuer')],
+  'keycloak-reg': [L('Consola Keycloak', '/idp-reg/admin/master/console/')],
+  'haproxy-uis': [L('Emisor UIS', '/uis-issuer/')],
+  'keycloak-uis': [L('Consola Keycloak', '/idp-uis/admin/master/console/')],
+  'spartans-wallet-provider': [L('Wallet Provider', '/wallet-provider/'), L('JWKS', '/jwks'), L('Metadatos', '/.well-known/oauth-protected-resource')],
+  'onboarding-backend': [L('Onboarding', '/onboarding/')],
+  'trust-validator': [L('Salud', '/trust-validator/actuator/health')],
+  'tl-publisher': [L('Listas publicadas', '/tl-publisher/tl-api/v1/lists')],
+  'nw-nginx': [L('Inicio', '/')],
+  'avance-control-panel': [L('Panel', '/'), L('Recursos', '/recursos')],
+};
+const CON_SALUD = new Set(['banco', 'contratacion', 'discoteca', 'notaria', 'eps', 'aerolinea', 'acceso', 'beca', 'pensiones', 'cancilleria']);
+const ENLACES_EXTRA = { eps: [L('Administración', '/eps/admin'), L('Portal médico', '/eps/medico')] };
+
+function enlacesDe(nombre, servicio, stack, tarjeta) {
+  if (ENLACES_FIJOS[nombre]) return ENLACES_FIJOS[nombre];
+  if (tarjeta?.stacks?.length) {
+    const verifier = tarjeta.stacks[0], aplicacion = tarjeta.stacks[tarjeta.stacks.length - 1];
+    const instancia = verifier.project.replace(/^verifier-/, '');
+    if (stack === verifier.project) {
+      if (/haproxy|verifier-web/.test(servicio)) return [L('Verifier (interfaz)', `/verifier-${instancia}/`)];
+      if (/verifier-api/.test(servicio)) return [L('Salud del verifier', `/verifier-${instancia}/actuator/health`)];
+    } else if (stack === aplicacion.project) {
+      return [L('Portal', tarjeta.url), ...(CON_SALUD.has(aplicacion.project) ? [L('Salud', tarjeta.url + 'salud')] : []), ...(ENLACES_EXTRA[aplicacion.project] || [])];
+    }
+  }
+  if (tarjeta?.url && tarjeta.url !== '/') return [L('Proyecto', tarjeta.url)];
+  return [];
+}
+
+async function recursos() {
+  const ids = (await run(['ps','-a','-q','--no-trunc'], root, 15_000)).split('\n').filter(Boolean);
+  const inspeccionados = ids.length ? JSON.parse(await run(['inspect', ...ids], root, 30_000)) : [];
+  const contenedores = inspeccionados.map((c) => {
+    const nombre = c.Name.replace(/^\//, '');
+    const etiquetas = c.Config?.Labels || {};
+    const tarjeta = tarjetaDe.get(nombre);
+    const redes = Object.entries(c.NetworkSettings?.Networks || {}).map(([red, datos]) => ({
+      red, ip: datos.IPAddress || '', alias: (datos.Aliases || []).filter((a) => !c.Id.startsWith(a) && a !== nombre),
+    }));
+    const compartida = redes.find((r) => r.red === 'avance-eudi');
+    const hosts = [...new Set([...(compartida?.alias || []), ...redes.flatMap((r) => r.alias)])];
+    const { publicados, internos } = puertos(c);
+    const base = datosBase(c, publicados);
+    return {
+      nombre, id:c.Id.slice(0, 12), imagen:c.Config?.Image || '',
+      enlaces:enlacesDe(nombre, etiquetas['com.docker.compose.service'] || '', etiquetas['com.docker.compose.project'] || '', tarjeta),
+      tipo:tipoDe(nombre, tarjeta, base), proyecto:tarjeta?.name || etiquetas['com.docker.compose.project'] || nombre, base,
+      estado:c.State.Status, salud:c.State.Health?.Status || '', reinicios:c.RestartCount || 0, codigo:c.State.ExitCode,
+      inicio:c.State.StartedAt, fin:c.State.FinishedAt, creado:c.Created,
+      host:hosts[0] || nombre, hosts, redes,
+      publicados, internos,
+      stack:etiquetas['com.docker.compose.project'] || '',
+      servicio:etiquetas['com.docker.compose.service'] || '',
+      tarjeta:tarjeta ? { id:tarjeta.id, nombre:tarjeta.name, grupo:tarjeta.group, url:tarjeta.url || '' } : null,
+      volumenes:(c.Mounts || []).filter((m) => m.Type === 'volume').map((m) => m.Name),
+    };
+  }).sort((a, b) => (a.tarjeta?.grupo || 'zz').localeCompare(b.tarjeta?.grupo || 'zz') || (a.tarjeta?.nombre || a.nombre).localeCompare(b.tarjeta?.nombre || b.nombre) || a.nombre.localeCompare(b.nombre));
+
+  const idsRedes = (await run(['network','ls','-q'], root, 15_000)).split('\n').filter(Boolean);
+  const redes = (idsRedes.length ? JSON.parse(await run(['network','inspect', ...idsRedes], root, 30_000)) : []).map((r) => ({
+    nombre:r.Name, controlador:r.Driver, ambito:r.Scope, subred:r.IPAM?.Config?.[0]?.Subnet || '',
+    contenedores:Object.values(r.Containers || {}).map((c) => c.Name).sort(), externa:!r.Labels?.['com.docker.compose.network'],
+  })).sort((a, b) => b.contenedores.length - a.contenedores.length || a.nombre.localeCompare(b.nombre));
+
+  const nombresVolumenes = (await run(['volume','ls','-q'], root, 15_000)).split('\n').filter(Boolean);
+  const volumenes = nombresVolumenes.map((nombre) => ({ nombre, usadoPor:contenedores.filter((c) => c.volumenes.includes(nombre)).map((c) => c.nombre) }))
+    .sort((a, b) => b.usadoPor.length - a.usadoPor.length || a.nombre.localeCompare(b.nombre));
+
+  return { ahora:new Date().toISOString(), contenedores, redes, volumenes };
+}
+
+const oyentes = new Set();
+let ultimaFoto = null, escuchando = false, pendiente = null;
+async function difundir() {
+  try { ultimaFoto = JSON.stringify(await recursos()); }
+  catch (error) { ultimaFoto = JSON.stringify({ error:error.message, ahora:new Date().toISOString() }); }
+  for (const res of oyentes) res.write(`data: ${ultimaFoto}\n\n`);
+}
+function programar() { clearTimeout(pendiente); pendiente = setTimeout(difundir, 400); }
+function escucharDocker() {
+  if (escuchando) return;
+  escuchando = true;
+  const hijo = spawn('docker', ['events','--format','{{json .}}','--filter','type=container','--filter','type=network','--filter','type=volume'], { stdio:['ignore','pipe','ignore'] });
+  setInterval(programar, 60_000); // red de seguridad: si se pierde un evento, la foto se renueva sola
+  const relevantes = /^(create|start|stop|die|destroy|kill|pause|unpause|rename|restart|oom|connect|disconnect|remove|health_status)/;
+  let resto = '';
+  hijo.stdout.on('data', (datos) => {
+    resto += datos;
+    const lineas = resto.split('\n'); resto = lineas.pop();
+    for (const linea of lineas) { try { if (relevantes.test(JSON.parse(linea).Action || '')) programar(); } catch { /* línea parcial */ } }
+  });
+  const reintentar = () => { escuchando = false; setTimeout(() => oyentes.size && escucharDocker(), 3000); };
+  hijo.on('close', reintentar); hijo.on('error', reintentar);
+}
+
 function send(res, code, data) {
   const body = JSON.stringify(data);
   res.writeHead(code, {'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'});
@@ -356,6 +533,19 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith('/api/')) {
     if (!authorized(req)) return send(res, 401, {error:'Token de acceso incorrecto o ausente.'});
     if (pathname === '/api/projects' && req.method === 'GET') return send(res, 200, await Promise.all(projects.map(status)));
+    if (pathname === '/api/recursos' && req.method === 'GET') {
+      try { return send(res, 200, await recursos()); } catch (error) { return send(res, 500, {error:error.message}); }
+    }
+    // Canal en vivo (text/event-stream): una foto al abrir, otra por cada cambio de Docker y un latido cada 15 s.
+    if (pathname === '/api/recursos/stream' && req.method === 'GET') {
+      res.writeHead(200, {'content-type':'text/event-stream; charset=utf-8','cache-control':'no-store','x-accel-buffering':'no','connection':'keep-alive','x-content-type-options':'nosniff'});
+      oyentes.add(res);
+      escucharDocker();
+      if (!ultimaFoto) await difundir(); else res.write(`data: ${ultimaFoto}\n\n`);
+      const latido = setInterval(() => res.write(': latido\n\n'), 15_000);
+      req.on('close', () => { clearInterval(latido); oyentes.delete(res); });
+      return;
+    }
     // Un solo comando para todo el ecosistema.
     if (pathname === '/api/all/action' && req.method === 'POST') {
       try {
@@ -425,7 +615,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, {error:'Ruta no encontrada.'});
   }
 
-  const relative = pathname === '/' ? 'index.html' : decodeURIComponent(pathname.slice(1));
+  const relative = pathname === '/' ? 'index.html' : pathname === '/recursos' ? 'recursos.html' : decodeURIComponent(pathname.slice(1));
   const file = path.resolve(projectDir, relative);
   if (!file.startsWith(projectDir + path.sep)) {
     res.writeHead(403);

@@ -108,7 +108,7 @@
   @media (max-width: 760px) { .pase .talon { border-left: 0; border-top: 2px dashed var(--linea); } }
   .pase .talon img.qr { width: 180px; height: 180px; border: 1px solid var(--linea); border-radius: 8px; }
   .pin { font-family: ui-monospace, monospace; font-size: 2rem; letter-spacing: 8px; font-weight: 800; color: var(--rojo); }
-  .estado-b { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: .75rem; font-weight: 800; } .estado-b.vigente { background: var(--ok-fondo); color: var(--ok); } .estado-b.anulado { background: var(--mal-fondo); color: var(--mal); }
+  .estado-b { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: .75rem; font-weight: 800; } .estado-b.vigente { background: var(--ok-fondo); color: var(--ok); } .estado-b.anulado { background: var(--mal-fondo); color: var(--mal); } .estado-b.abordo { background: #e3e8f7; color: #243a7a; } .estado-b.gris { background: #eee; color: #555; }
   .embarque { display: grid; grid-template-columns: 200px 1fr; gap: 24px; align-items: start; }
   @media (max-width: 640px) { .embarque { grid-template-columns: 1fr; } }
   .embarque img.foto { width: 200px; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; border: 3px solid #fff; box-shadow: 0 0 0 1px var(--linea), 0 10px 30px rgba(0,0,0,.18); background: #ddd; }
@@ -217,11 +217,11 @@
   }
 
   // Abre la ventana con el QR de una solicitud al verifier y llama a `listo` con el resultado cuando la wallet responde.
-  async function pedirALaWallet({ proposito, titulo, sub, pide, demo, listo }) {
+  async function pedirALaWallet({ proposito, titulo, sub, pide, demo, previa, listo }) {
     parar()
     m.replaceChildren(el('div', { class: 'cargando' }, 'Preparando el código…'))
     if (!modal.open) modal.showModal()
-    const { ok, cuerpo } = await api('/api/solicitud', { method: 'POST', body: { proposito, demo } })
+    const { ok, cuerpo } = await api('/api/solicitud', { method: 'POST', body: { proposito, demo, previa } })
     if (!ok) { m.replaceChildren(el('h2', {}, 'No se pudo'), el('div', { class: 'aviso error' }, cuerpo.error ?? 'Error'), el('div', { class: 'acciones' }, el('button', { class: 'claro', onclick: cerrar }, 'Cerrar'))); return }
     const restante = el('div', { class: 'cuenta' })
     m.replaceChildren(
@@ -233,10 +233,10 @@
     cuenta = setInterval(() => { const s = Math.max(0, Math.round((limite - Date.now()) / 1000)); restante.textContent = `El código vence en ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }, 1000)
     sondeo = setInterval(async () => {
       const { cuerpo: r } = await api('/api/solicitud/' + cuerpo.id)
-      if (r.estado === 'listo') { parar(); modal.close(); await listo(r) }
+      if (r.estado === 'listo') { parar(); modal.close(); await listo(r, cuerpo.id) }
       else if (r.estado === 'rechazada') {
         parar()
-        m.replaceChildren(el('h2', {}, 'No se pudo verificar'), el('div', { class: 'aviso error' }, r.motivo), el('div', { class: 'acciones' }, el('button', { class: 'rojo', onclick: () => pedirALaWallet({ proposito, titulo, sub, pide, demo, listo }) }, 'Generar un código nuevo'), el('button', { class: 'claro', onclick: cerrar }, 'Cerrar')))
+        m.replaceChildren(el('h2', {}, 'No se pudo verificar'), el('div', { class: 'aviso error' }, r.motivo), el('div', { class: 'acciones' }, el('button', { class: 'rojo', onclick: () => pedirALaWallet({ proposito, titulo, sub, pide, demo, previa, listo }) }, 'Generar un código nuevo'), el('button', { class: 'claro', onclick: cerrar }, 'Cerrar')))
       }
     }, 2000)
   }
@@ -257,7 +257,7 @@
     for (const a of document.querySelectorAll('#menu a')) a.classList.toggle('activo', a.dataset.v === v)
     if (v === 'reservar') { widgetReservar(); vistaInicio() }
     else if (v === 'tiquetes') { widgetTexto('Tus tiquetes están en tu wallet. Aquí puedes volver a recibirlos o cancelarlos.'); vistaTiquetes() }
-    else { widgetEmbarque(); contenido.replaceChildren() }
+    else { widgetEmbarque() }
   }
   for (const b of document.querySelectorAll('#pestanas button')) b.addEventListener('click', () => ir(b.dataset.v))
   for (const a of document.querySelectorAll('#menu a')) a.addEventListener('click', () => { ir(a.dataset.v); window.scrollTo({ top: 0, behavior: 'smooth' }) })
@@ -330,59 +330,127 @@
   async function vistaCompra(v, tarifa) {
     const { cuerpo } = await api('/api/vuelos?' + new URLSearchParams(busqueda))
     const vuelo = cuerpo.vuelos.find((x) => x.salida === v.salida)
-    const t = vuelo.tarifas[tarifa]
     const nombre = (c) => ciudades.find((x) => x.codigo === c)?.nombre ?? c
-    const edad = (() => { const n = new Date(`${persona.fecha_nacimiento}T00:00:00Z`), f = new Date(`${busqueda.fecha}T00:00:00Z`); let e = f.getUTCFullYear() - n.getUTCFullYear(); if (f < new Date(Date.UTC(f.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()))) e -= 1; return e })()
+    const edadA = (nac) => { const n = new Date(`${nac}T00:00:00Z`), f = new Date(`${busqueda.fecha}T00:00:00Z`); let e = f.getUTCFullYear() - n.getUTCFullYear(); if (f < new Date(Date.UTC(f.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()))) e -= 1; return e }
+    const edad = edadA(persona.fecha_nacimiento)
+
+    // Una compra puede llevar varios pasajeros: yo (datos verificados con mi wallet) y hasta 3 menores a mi cargo (los datos de
+    // cada menor los escribo yo, que respondo por él). Cada pasajero tiene su propio tiquete.
+    const propio = { t: vuelo.tarifas[tarifa], categoria: cuerpo.categoria, edad }
+    const yo = el('input', { type: 'checkbox', checked: true, style: 'width:auto' })
+    const menores = [] // { campos, t, categoria, edad, caja }
+    const listaMenores = el('div', { class: 'campos-col' })
+    const agregar = el('button', { type: 'button', class: 'borde' }, '+ Agregar un menor a mi cargo')
+    const resumenFilas = el('tbody')
+    const total = el('td', {}), nota = el('div'), error = el('div', { class: 'aviso error', hidden: true })
+    const pagar = el('button', { class: 'rojo', type: 'submit' })
+
+    const pintar = () => {
+      const filas = []
+      if (yo.checked) filas.push([`${persona.nombres.split(' ')[0]} · ${propio.categoria}`, propio.t.total])
+      for (const m of menores) filas.push([`${m.campos.nombre.value.trim() || 'Menor a mi cargo'} · ${m.categoria ?? 'indica su fecha de nacimiento'}`, m.t?.total ?? 0])
+      resumenFilas.replaceChildren(...filas.map(([k, x]) => el('tr', {}, el('td', {}, k), el('td', {}, cop(x)))))
+      const suma = filas.reduce((a2, f) => a2 + f[1], 0)
+      total.textContent = `${cop(suma)} COP`
+      pagar.textContent = `Pagar ${cop(suma)} COP (simulado)`
+      pagar.disabled = filas.length === 0
+      const hayMenor = (yo.checked && edad < 18) || menores.some((m) => m.edad !== null && m.edad < 18)
+      nota.replaceChildren(vuelo.internacional && hayMenor
+        ? el('div', { class: 'aviso info' }, 'Hay un pasajero menor de edad en un vuelo internacional: en el embarque se exigirá el permiso de salida del país que otorga una notaría. Si todavía no lo tienes, pídelo en la notaría antes de viajar.') : '')
+    }
+    yo.addEventListener('change', pintar)
+
+    const nuevoMenor = () => {
+      const campos = {
+        nombre: el('input', { maxlength: 120, required: true, placeholder: 'Nombre completo del menor' }),
+        tipo: el('select', {}, el('option', { value: 'Registro civil' }, 'Registro civil'), el('option', { value: 'Tarjeta de identidad' }, 'Tarjeta de identidad')),
+        documento: el('input', { inputmode: 'numeric', required: true, placeholder: 'Número del documento' }),
+        nacimiento: el('input', { type: 'date', required: true, max: hoy }),
+      }
+      const m = { campos, t: null, categoria: null, edad: null }
+      const quitar = el('button', { type: 'button', class: 'claro', onclick: () => { menores.splice(menores.indexOf(m), 1); m.caja.remove(); agregar.hidden = false; pintar() } }, 'Quitar')
+      m.caja = el('div', { class: 'panel', style: 'padding:16px;margin:0;background:var(--fondo)' },
+        el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px' }, el('b', {}, 'Menor a mi cargo'), quitar),
+        el('div', { class: 'campos-col' },
+          el('label', {}, 'Nombre completo', campos.nombre),
+          el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:12px' }, el('label', {}, 'Tipo de documento', campos.tipo), el('label', {}, 'Número', campos.documento)),
+          el('label', {}, 'Fecha de nacimiento', campos.nacimiento)))
+      campos.nombre.addEventListener('input', pintar)
+      campos.nacimiento.addEventListener('change', async () => {
+        m.edad = edadA(campos.nacimiento.value)
+        const r = await api('/api/vuelos?' + new URLSearchParams({ ...busqueda, nacimiento: campos.nacimiento.value }))
+        if (r.ok) { m.t = r.cuerpo.vuelos.find((x) => x.salida === v.salida).tarifas[tarifa]; m.categoria = r.cuerpo.categoria }
+        pintar()
+      })
+      menores.push(m); listaMenores.append(m.caja)
+      agregar.hidden = menores.length >= 3
+      pintar()
+    }
+    agregar.addEventListener('click', nuevoMenor)
+
     const email = el('input', { type: 'email', required: true, placeholder: 'tucorreo@ejemplo.com', autocomplete: 'email' })
     const tel = el('input', { type: 'tel', required: true, placeholder: '3001234567', autocomplete: 'tel' })
-    const error = el('div', { class: 'aviso error', hidden: true })
-    const pagar = el('button', { class: 'rojo', type: 'submit' }, `Pagar ${cop(t.total)} COP (simulado)`)
     const form = el('form', { class: 'campos-col', onsubmit: async (e) => {
-      e.preventDefault(); error.hidden = true; pagar.disabled = true
-      const r = await api('/api/comprar', { method: 'POST', body: { ...busqueda, salida: v.salida, tarifa, email: email.value, telefono: tel.value } })
+      e.preventDefault(); error.hidden = true
+      const pasajeros = []
+      if (yo.checked) pasajeros.push({ tipo: 'yo' })
+      for (const m of menores) pasajeros.push({ tipo: 'menor', nombre: m.campos.nombre.value, tipo_documento: m.campos.tipo.value, documento: m.campos.documento.value, nacimiento: m.campos.nacimiento.value })
+      pagar.disabled = true
+      const r = await api('/api/comprar', { method: 'POST', body: { ...busqueda, salida: v.salida, tarifa, email: email.value, telefono: tel.value, pasajeros } })
       if (!r.ok) { error.textContent = r.cuerpo.error; error.hidden = false; pagar.disabled = false; return }
-      vistaEntrega(r.cuerpo.reserva, r.cuerpo.oferta)
+      vistaEntrega(r.cuerpo.reservas)
     } },
+      el('h3', { style: 'margin:0' }, '¿Quién viaja?'),
+      el('label', { style: 'flex-direction:row;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:1rem;color:var(--tinta)' }, yo, `Yo (${persona.nombres} ${persona.apellidos}) · ${propio.categoria}`),
+      listaMenores, agregar,
+      el('h3', { style: 'margin:8px 0 0' }, 'Contacto'),
       el('label', {}, 'Correo electrónico', email), el('label', {}, 'Teléfono de contacto', tel),
       el('div', { class: 'aviso info' }, 'El correo y el teléfono no vienen de tu documento: los escribes tú para que la aerolínea pueda avisarte de cambios en el vuelo.'),
-      vuelo.internacional && edad < 18 ? el('div', { class: 'aviso info' }, 'Eres menor de edad y el vuelo es internacional: necesitarás permiso de salida del país otorgado ante notario.') : '', error, pagar)
+      nota, error, pagar)
+    pintar()
     contenido.replaceChildren(
-      el('h2', {}, 'Datos del pasajero'), el('p', { class: 'sub' }, 'Estos datos los compartió tu wallet y los verificó la Registraduría. No se pueden editar.'),
+      el('h2', {}, 'Pasajeros y pago'), el('p', { class: 'sub' }, 'Tus datos los compartió tu wallet y los verificó la Registraduría. Puedes comprar en la misma operación el tiquete de menores a tu cargo: cada uno recibe el suyo.'),
       el('div', { class: 'dos' },
         el('div', { class: 'panel' },
           el('div', { class: 'pasajero' }, persona.foto ? el('img', { src: persona.foto, alt: 'Foto del documento' }) : el('div', { class: 'sin-foto' }, 'Sin foto'),
             el('div', {}, el('span', { class: 'sello' }, '✔ Verificado con tu wallet'), el('div', {}, el('b', {}, `${persona.nombres} ${persona.apellidos}`)),
-              el('small', {}, `Documento ${persona.documento}`), el('small', {}, `Nacimiento ${fechaLarga(persona.fecha_nacimiento)} · ${edad} años · ${cuerpo.categoria}`))),
+              el('small', {}, `Documento ${persona.documento}`), el('small', {}, `Nacimiento ${fechaLarga(persona.fecha_nacimiento)} · ${edad} años`))),
           form),
         el('div', { class: 'panel' }, el('h3', {}, 'Resumen'),
           el('table', { class: 'resumen' },
             el('tr', {}, el('td', {}, `${nombre(vuelo.origen)} → ${nombre(vuelo.destino)}`), el('td', {}, vuelo.vuelo)),
             el('tr', {}, el('td', {}, fechaLarga(busqueda.fecha)), el('td', {}, `${vuelo.salida} – ${vuelo.llegada}`)),
-            el('tr', {}, el('td', {}, `Tarifa ${t.nombre}`), el('td', {}, cop(t.tarifa))),
-            el('tr', {}, el('td', {}, 'Tasas e impuestos'), el('td', {}, cop(t.tasas))),
-            el('tr', { class: 'total' }, el('td', {}, 'Total'), el('td', {}, `${cop(t.total)} COP`))),
-          el('p', { style: 'color:var(--suave);font-size:.82rem' }, t.equipaje, ' ', t.cambios))))
+            el('tr', {}, el('td', {}, `Tarifa ${propio.t.nombre} (con tasas)`), el('td', {}, '')),
+            resumenFilas,
+            el('tr', { class: 'total' }, el('td', {}, 'Total'), total)),
+          el('p', { style: 'color:var(--suave);font-size:.82rem' }, propio.t.equipaje, ' ', propio.t.cambios))))
     contenido.scrollIntoView({ behavior: 'smooth' })
   }
 
   // ---- Tiquete (pase de abordar) ---------------------------------------------------------------
+  // Ciclo de vida de un tiquete: emitido → en la wallet → abordado (usado); o cancelado.
+  const ETIQUETA_USO = { emitido: 'EMITIDO · AÚN NO ESTÁ EN TU WALLET', en_wallet: 'EN TU WALLET · LISTO PARA EL EMBARQUE', abordado: 'ABORDADO · TIQUETE USADO', cancelado: 'TIQUETE CANCELADO' }
   function pase(r, oferta) {
     const cod = (t) => /\((\w+)\)/.exec(t)?.[1] ?? t
     return el('div', { class: 'pase' },
       el('div', { class: 'principal' },
-        el('div', { class: `franja${r.estado === 'anulado' ? ' cancelado' : ''}` }, el('span', {}, '{{AEROLINEA}}'.toUpperCase()), el('span', {}, r.estado === 'anulado' ? 'TIQUETE CANCELADO' : 'TIQUETE ELECTRÓNICO')),
+        el('div', { class: `franja${r.uso === 'cancelado' || r.uso === 'abordado' ? ' cancelado' : ''}` }, el('span', {}, '{{AEROLINEA}}'.toUpperCase()), el('span', {}, ETIQUETA_USO[r.uso] ?? 'TIQUETE ELECTRÓNICO')),
         el('div', { class: 'ruta' }, el('div', { class: 'ciudad' }, el('b', {}, cod(r.origen)), el('small', {}, r.origen.replace(/\s*\(.*\)/, ''))),
           el('div', { class: 'avion' }, el('span', {}, '✈')), el('div', { class: 'ciudad' }, el('b', {}, cod(r.destino)), el('small', {}, r.destino.replace(/\s*\(.*\)/, '')))),
-        el('dl', {}, ...[['Fecha', fechaLarga(r.fecha)], ['Salida', r.salida], ['Llegada', r.llegada], ['Vuelo', r.vuelo], ['Reserva', r.reserva], ['Tiquete', r.numero_tiquete], ['Tarifa', r.tarifa], ['Pasajero', r.categoria], ['Valor', r.valor_pagado]]
+        el('dl', {}, ...[['Fecha', fechaLarga(r.fecha)], ['Salida', r.salida], ['Llegada', r.llegada], ['Vuelo', r.vuelo], ['Reserva', r.reserva], ['Tiquete', r.numero_tiquete], ['Tarifa', r.tarifa], ['Pasajero', r.pasajero ?? r.categoria], ['Tipo', r.categoria + (r.menor ? ' · menor de edad' : '')], ['Valor', r.valor_pagado]]
           .map(([k, v]) => el('div', {}, el('dt', {}, k), el('dd', {}, v))))),
       oferta ? el('div', { class: 'talon' }, el('b', {}, 'Recíbelo en tu wallet'), el('img', { class: 'qr', src: oferta.qr, alt: 'QR de la oferta' }), el('div', { class: 'pin' }, oferta.pin),
         el('small', { style: 'color:var(--suave)' }, 'Escanea y escribe este PIN. La oferta vale 15 minutos y sirve una vez.')) : null)
   }
 
-  function vistaEntrega(r, oferta) {
+  // Uno o varios tiquetes recién comprados (o uno que se vuelve a pedir): cada uno con su QR y su PIN.
+  function vistaEntrega(items) {
+    const varios = items.length > 1
     contenido.replaceChildren(
-      el('div', { class: 'aviso ok', style: 'margin-bottom:16px' }, `✔ Compra confirmada. Reserva ${r.reserva}. Se emitió tu tiquete electrónico.`),
-      pase(r, oferta),
+      el('div', { class: 'aviso ok', style: 'margin-bottom:16px' }, varios
+        ? `✔ Compra confirmada. Reserva ${items[0].reserva.reserva} con ${items.length} pasajeros: un tiquete por pasajero, cada uno con su propio código y PIN.`
+        : `✔ Compra confirmada. Reserva ${items[0].reserva.reserva}. Se emitió tu tiquete electrónico.`),
+      ...items.map(({ reserva, oferta }) => pase(reserva, oferta)),
       el('div', { class: 'acciones', style: 'justify-content:flex-start' }, el('button', { class: 'rojo', onclick: () => ir('tiquetes') }, 'Ir a mis tiquetes'), el('button', { class: 'borde', onclick: () => ir('reservar') }, 'Comprar otro')))
     contenido.scrollIntoView({ behavior: 'smooth' })
   }
@@ -391,38 +459,115 @@
     if (!persona) { contenido.replaceChildren(el('div', { class: 'panel' }, el('h3', {}, 'Identifícate para ver tus tiquetes'), el('p', { class: 'sub' }, 'Tus tiquetes están asociados a tu documento.'), el('button', { class: 'rojo', onclick: () => identificarse(() => ir('tiquetes')) }, 'Identificarme con mi wallet'))); return }
     contenido.replaceChildren(el('div', { class: 'cargando' }, 'Cargando…'))
     const { cuerpo } = await api('/api/tiquetes')
-    contenido.replaceChildren(el('h2', {}, 'Mis tiquetes'), el('p', { class: 'sub' }, 'Cancelar un tiquete lo revoca: dejará de ser válido en el embarque.'),
-      ...(cuerpo.length ? cuerpo.map((r) => el('div', {},
-        pase(r, null),
-        el('div', { class: 'acciones', style: 'justify-content:flex-start;margin:-6px 0 22px' },
-          r.estado === 'anulado' ? el('span', { class: 'estado-b anulado' }, 'Cancelado') : [el('span', { class: 'estado-b vigente' }, 'Vigente'),
-            el('button', { class: 'borde', onclick: async () => { const x = await api(`/api/tiquetes/${r.numero}/oferta`, { method: 'POST' }); if (x.ok) vistaEntrega(r, x.cuerpo.oferta); else alert(x.cuerpo.error) } }, 'Recibir de nuevo en mi wallet'),
-            el('button', { class: 'claro', onclick: async () => { if (confirm('¿Cancelar este tiquete? No se puede deshacer.')) { await api(`/api/tiquetes/${r.numero}/cancelar`, { method: 'POST' }); vistaTiquetes() } } }, 'Cancelar tiquete')]))) : [el('div', { class: 'aviso info' }, 'Todavía no has comprado ningún tiquete.')]))
+    // Una reserva agrupa los tiquetes de una misma compra (tú y los menores a tu cargo).
+    const grupos = new Map()
+    for (const r of cuerpo) { grupos.set(r.reserva, [...(grupos.get(r.reserva) ?? []), r]) }
+    const recibir = async (r, reexpedir) => {
+      if (reexpedir && !confirm('¿Reexpedir este tiquete? La copia que tienes en tu wallet dejará de valer y recibirás una nueva.')) return
+      const x = await api(`/api/tiquetes/${r.numero}/oferta`, { method: 'POST', body: reexpedir ? { reexpedir: true } : {} })
+      if (x.ok) vistaEntrega([{ reserva: r, oferta: x.cuerpo.oferta }]); else alert(x.cuerpo.error)
+    }
+    const acciones = (r) => {
+      if (r.uso === 'cancelado') return el('span', { class: 'estado-b anulado' }, 'Cancelado')
+      if (r.uso === 'abordado') return el('span', { class: 'estado-b anulado', style: 'background:#eee;color:#555' }, 'Abordado · usado: ya no vale')
+      const b = [el('span', { class: 'estado-b vigente' }, r.uso === 'en_wallet' ? 'En tu wallet' : 'Emitido, falta recibirlo')]
+      b.push(r.uso === 'emitido'
+        ? el('button', { class: 'borde', onclick: () => recibir(r, false) }, 'Recibir en mi wallet')
+        : el('button', { class: 'claro', title: 'Si perdiste tu tiquete: la copia anterior se revoca', onclick: () => recibir(r, true) }, 'Reexpedir (lo perdí)'))
+      b.push(el('button', { class: 'claro', onclick: async () => { if (confirm('¿Cancelar este tiquete? No se puede deshacer.')) { await api(`/api/tiquetes/${r.numero}/cancelar`, { method: 'POST' }); vistaTiquetes() } } }, 'Cancelar tiquete'))
+      return b
+    }
+    contenido.replaceChildren(el('h2', {}, 'Mis tiquetes'), el('p', { class: 'sub' }, 'Cada tiquete se entrega una sola vez a una wallet. Al abordar se usa y deja de valer. Cancelarlo también lo revoca.'),
+      ...(grupos.size ? [...grupos.entries()].map(([codigo, lista]) => el('div', { style: 'margin-bottom:26px' },
+        el('h3', { style: 'margin:0 0 10px;font-size:1rem;color:var(--suave)' }, `Reserva ${codigo} · ${lista.length} pasajero${lista.length > 1 ? 's' : ''}`),
+        ...lista.map((r) => el('div', {}, pase(r, null), el('div', { class: 'acciones', style: 'justify-content:flex-start;margin:-6px 0 14px' }, acciones(r)))))) : [el('div', { class: 'aviso info' }, 'Todavía no has comprado ningún tiquete.')]))
   }
 
   // ---- Embarque --------------------------------------------------------------------------------
-  function widgetEmbarque() {
+  const ETIQUETA_USO_CORTA = { emitido: ['Emitido', 'gris'], en_wallet: ['En wallet · espera el embarque', 'vigente'], abordado: ['Abordó', 'abordo'], cancelado: ['Cancelado', 'anulado'] }
+
+  // La pestaña de embarque: los vuelos con pasajeros dados de alta, el manifiesto del vuelo elegido (con el estado de cada tiquete) y la
+  // verificación en el mostrador.
+  async function widgetEmbarque() {
     const demo = el('input', { type: 'checkbox', checked: true, style: 'width:auto' })
     widget.replaceChildren(
-      el('p', { style: 'margin:0 0 12px;color:var(--suave)' }, 'El pasajero escanea un código y su wallet presenta el tiquete y el documento de identidad. Se comprueba que el tiquete es de esta aerolínea, está vigente y es de quien lo presenta.'),
+      el('p', { style: 'margin:0 0 12px;color:var(--suave)' }, 'En el mostrador, la persona se identifica y presenta su tiquete y los de los menores a su cargo, todos en un solo código. Se comprueba que cada tiquete es de esta aerolínea, está vigente y es de quien lo presenta. Los que cumplen abordan y quedan usados. Un menor en un vuelo internacional necesita además su permiso de salida del país.'),
       el('label', { style: 'flex-direction:row;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:.9rem;color:var(--tinta);margin-bottom:14px' }, demo, 'Modo demostración: no exigir que el vuelo sea hoy'),
       el('button', { class: 'rojo', onclick: () => pedirALaWallet({
-        proposito: 'embarque', demo: demo.checked, titulo: 'Embarque: presenta tu tiquete', sub: 'Escanea con tu wallet.',
-        pide: 'el tiquete (reserva, vuelo, origen, destino, fecha) y, del documento de identidad, tu nombre, documento y foto.', listo: (r) => resultadoEmbarque(r.embarque),
-      }) }, 'Verificar tiquete y documento'))
+        proposito: 'embarque', demo: demo.checked, titulo: 'Embarque: presenta tu tiquete', sub: 'Escanea con tu wallet y elige todos los tiquetes que embarcan contigo.',
+        pide: 'tus tiquetes (reserva, vuelo, origen, destino, fecha, quién viaja y su responsable) y, del documento de identidad, tu nombre, documento y foto.',
+        listo: (r, id) => resultadoEmbarque(r.embarque, id),
+      }) }, 'Verificar tiquetes y documento'))
+    contenido.replaceChildren(el('div', { id: 'manifiestos' }))
+    cargarManifiestos()
   }
 
-  function resultadoEmbarque(e) {
+  async function cargarManifiestos(elegido) {
+    const caja = $('manifiestos'); if (!caja) return
+    const { cuerpo } = await api('/api/vuelos-con-tiquetes')
+    const vuelos = cuerpo.vuelos ?? []
+    const cuadro = el('div')
+    const mostrar = async (v) => {
+      const r = await api(`/api/manifiesto?vuelo=${encodeURIComponent(v.vuelo)}&fecha=${v.fecha}`)
+      const n = (u) => r.cuerpo.pasajeros.filter((x) => x.uso === u).length
+      cuadro.replaceChildren(
+        el('p', { class: 'sub', style: 'margin:10px 0' }, `${r.cuerpo.pasajeros.length} pasajeros dados de alta · ${n('abordado')} abordaron · ${n('en_wallet')} esperan el embarque · ${n('emitido')} aún sin recibir`),
+        el('table', { class: 'resumen' }, el('tr', {}, ...['Reserva', 'Tiquete', 'Pasajero', 'Documento', 'Tipo', 'Estado'].map((h) => el('td', { style: 'font-weight:700;color:var(--suave)' }, h))),
+          ...r.cuerpo.pasajeros.map((x) => el('tr', {}, el('td', { style: 'text-align:left;font-weight:600' }, x.reserva), el('td', { style: 'text-align:left;font-weight:400' }, x.tiquete),
+            el('td', { style: 'text-align:left;font-weight:400' }, x.pasajero), el('td', { style: 'text-align:left;font-weight:400' }, x.documento),
+            el('td', { style: 'text-align:left;font-weight:400' }, x.tipo + (x.menor ? ' · menor' : '')),
+            el('td', { style: 'text-align:left' }, el('span', { class: `estado-b ${(ETIQUETA_USO_CORTA[x.uso] ?? ['', 'vigente'])[1]}` }, (ETIQUETA_USO_CORTA[x.uso] ?? [x.uso])[0]))))))
+    }
+    const lista = vuelos.length
+      ? el('select', { onchange: (e) => mostrar(vuelos[Number(e.target.value)]) }, ...vuelos.map((v, i) => el('option', { value: i, ...(elegido === `${v.vuelo}|${v.fecha}` ? { selected: true } : {}) }, `${v.vuelo} · ${v.origen} → ${v.destino} · ${fechaLarga(v.fecha)} ${v.salida} · ${v.tiquetes} tiquete${v.tiquetes > 1 ? 's' : ''}`)))
+      : null
+    caja.replaceChildren(el('h2', {}, 'Pasajeros del vuelo'), el('p', { class: 'sub' }, 'Los tiquetes dados de alta para cada vuelo y su estado. Los datos van enmascarados: este portal de ejemplo no tiene acceso de personal.'),
+      el('div', { class: 'panel' }, vuelos.length ? [el('label', {}, 'Vuelo', lista), cuadro] : el('div', { class: 'aviso info' }, 'Todavía no hay tiquetes emitidos para ningún vuelo.')))
+    if (vuelos.length) mostrar(vuelos.find((v) => `${v.vuelo}|${v.fecha}` === elegido) ?? vuelos[0])
+  }
+
+  const pedirPermiso = (e, id) => pedirALaWallet({
+    proposito: 'permiso', previa: id, titulo: 'Permiso de salida del país', sub: 'Escanea con la wallet del adulto responsable y elige el permiso de cada menor.',
+    pide: 'el permiso de salida de menor que otorgó una notaría: quién lo otorgó, el menor, el destino y las fechas del viaje.',
+    listo: (r) => resultadoEmbarque(e, id, r.permiso).then(cargarManifiestos),
+  })
+
+  // Resultado de presentar uno o varios tiquetes. `permiso` llega después del segundo paso, con un resultado por menor.
+  async function resultadoEmbarque(e, id, permiso) {
+    const fila = (c) => el('div', { class: `criterio${c.cumple ? '' : ' no'}` }, el('div', { class: 'm' }, c.cumple ? '✔' : '✖'), el('div', {}, el('b', {}, c.nombre), el('span', {}, c.detalle)))
+    const delPermiso = (numeroTiquete) => permiso?.resultados.find((x) => x.tiquete === numeroTiquete)
+    const estadoDe = (t) => {
+      const pr = delPermiso(t.numero)
+      if (t.abordo || pr?.abordo) return 'abordo'
+      if (t.requierePermiso && t.ok && !pr) return 'pendiente'
+      return 'no'
+    }
+    const etiqueta = { abordo: ['✔ Abordó', 'si'], pendiente: ['⏳ Falta el permiso de salida del país', 'pend'], no: ['✖ No puede abordar', 'no'] }
+    const pendientes = e.tiquetes.filter((t) => estadoDe(t) === 'pendiente')
     contenido.replaceChildren(
-      el('h2', {}, 'Resultado del embarque'),
+      el('div', { id: 'resultado' }),
+      el('div', { id: 'manifiestos' }))
+    const cuadroR = $('resultado')
+    cuadroR.replaceChildren(
+      el('h2', {}, `Resultado del embarque · ${e.tiquetes.length} tiquete${e.tiquetes.length > 1 ? 's' : ''}`),
       el('div', { class: 'panel' }, el('div', { class: 'embarque' },
         e.pasajero.foto ? el('img', { class: 'foto', src: e.pasajero.foto, alt: 'Foto del documento' }) : el('div', { class: 'sin-foto', style: 'width:200px;height:260px' }, 'Sin foto'),
         el('div', {},
-          el('div', { class: `veredicto ${e.puede ? 'si' : 'no'}` }, e.puede ? '✔ Puede abordar' : '✖ No puede abordar'),
-          el('p', { style: 'margin:0 0 4px;font-size:1.25rem;font-weight:800' }, e.pasajero.nombre), el('p', { style: 'margin:0 0 12px;color:var(--suave)' }, `Documento ${e.pasajero.documento} · compara la foto con la persona`),
-          ...e.criterios.map((c) => el('div', { class: `criterio${c.cumple ? '' : ' no'}` }, el('div', { class: 'm' }, c.cumple ? '✔' : '✖'), el('div', {}, el('b', {}, c.nombre), el('span', {}, c.detalle)))),
-          el('p', { style: 'margin:14px 0 0;color:var(--suave)' }, `Vuelo ${e.tiquete.vuelo} · ${e.tiquete.origen} → ${e.tiquete.destino} · ${fechaLarga(e.tiquete.fecha)} ${e.tiquete.hora} · reserva ${e.tiquete.reserva} · tarifa ${e.tiquete.tarifa}`)))))
+          el('p', { style: 'margin:0 0 2px;font-size:1.25rem;font-weight:800' }, e.pasajero.nombre),
+          el('p', { style: 'margin:0 0 12px;color:var(--suave)' }, `Documento ${e.pasajero.documento} · se identificó con su wallet. Compara la foto con la persona.`),
+          ...e.tiquetes.map((t) => {
+            const est = estadoDe(t), pr = delPermiso(t.numero)
+            return el('div', { style: 'border:1px solid var(--linea);border-radius:8px;padding:14px;margin-bottom:12px' },
+              el('div', { class: `veredicto ${etiqueta[est][1] === 'pend' ? '' : etiqueta[est][1]}`, style: etiqueta[est][1] === 'pend' ? 'background:#fff6e0;color:#6d5316;font-size:1.05rem' : 'font-size:1.05rem' }, `${etiqueta[est][0]} · ${t.viajero.menor ? `Menor: ${t.viajero.nombre}` : t.viajero.nombre}`),
+              el('p', { style: 'margin:0 0 8px;color:var(--suave);font-size:.88rem' }, `${t.vuelo} · ${t.origen} → ${t.destino} · ${fechaLarga(t.fecha)} ${t.hora} · reserva ${t.reserva} · tiquete ${t.numero} · ${t.tarifa}${t.viajero.menor ? ` · documento del menor ${t.viajero.documento}` : ''}`),
+              ...t.criterios.map(fila),
+              pr ? [el('h3', { style: 'margin:14px 0 6px;font-size:.95rem' }, 'Permiso de salida del país'), ...pr.criterios.map(fila),
+                pr.datos ? el('p', { style: 'margin:8px 0 0;color:var(--suave);font-size:.85rem' }, `Permiso n.º ${pr.datos.numero} · otorgado por ${pr.datos.otorgante} (${pr.datos.calidad}) · viaja con: ${pr.datos.acompanante ?? 'viaja solo(a)'} · otro progenitor: ${pr.datos.otro_progenitor}.`) : null] : null)
+          }),
+          pendientes.length ? el('div', {}, el('div', { class: 'aviso info', style: 'margin-bottom:12px' }, `${pendientes.length === 1 ? 'Hay un pasajero menor' : `Hay ${pendientes.length} pasajeros menores`} en un vuelo internacional. Pide al adulto responsable el permiso de salida del país que le dio una notaría (uno por menor).`),
+            el('button', { class: 'rojo', onclick: () => pedirPermiso(e, id) }, `Verificar ${pendientes.length === 1 ? 'el permiso' : 'los permisos'} de salida`)) : null))))
     contenido.scrollIntoView({ behavior: 'smooth' })
+    await cargarManifiestos()
   }
 
   // ---- Arranque --------------------------------------------------------------------------------

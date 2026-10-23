@@ -40,3 +40,15 @@ RNEC), constancia de identificación biométrica (depende del convenio RNEC, no 
 
 Qué se construye primero. Recomendación: **1 fe de vida, 2 autenticación de firma y 3 permiso de menor**, con el cambio común 1 (edad sin fecha de nacimiento).
 Cada acto nuevo es un `vct` y una configuración en `src/documentos.js`, su formulario en `src/publico/index.html` y su validación en `src/tramites.js`.
+
+
+## Estado (2026-10-23)
+
+- **Hecho:** el permiso de salida de menor ya lo consume la aerolínea (`/aerolinea`, embarque): para un menor en un vuelo internacional, además del tiquete y del PID del
+  adulto responsable, se pide el permiso notarial y se cruza con el tiquete (otorgante = adulto que se identificó, menor = pasajero del tiquete, destino, y que la fecha
+  del vuelo esté dentro del viaje autorizado). También ya estaban hechos «pedir solo mayor de 18» y la vigencia por acto.
+- **Hecho (23-oct, tarde):** fe de vida consumida por el portal del fondo de pensiones (`/pensiones`, estilo corporativo amarillo/azul); **constancia de copia de escritura**
+  (`urn:co:notaria:copia-escritura:1`, solo constancia, C-159/2021); **declaración de convivencia** (`urn:co:notaria:convivencia:1`, 90 días) que la EPS acepta para afiliar
+  al compañero(a) como beneficiario (el cotizante la presenta; la EPS comprueba emisor = notaría, declarante = quien se identificó y vigencia). Entrega única y reexpedición en la notaría.
+  **Sin probar con la wallet todavía.**
+- **En pausa:** unión marital de hecho (dos comparecientes con PID).

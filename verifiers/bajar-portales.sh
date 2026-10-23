@@ -10,7 +10,7 @@
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-PORTALES=(acceso beca aerolinea notaria eps contratacion banco discoteca)   # al revés de como se levantan
+PORTALES=(cancilleria pensiones acceso beca aerolinea notaria eps contratacion banco discoteca)   # al revés de como se levantan
 export UID_GID="$(id -u):$(id -g)"
 
 for n in "${PORTALES[@]}"; do

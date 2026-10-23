@@ -1,7 +1,7 @@
 # Portal del empleador (verificación académica). Se une a la red compartida "avance-eudi" con el alias
 # app-contratacion (srv-nw-nginx le pasa /contratacion/… con la ruta completa) y habla con su verifier
 # (../_comun, instancia VERIFIER_INSTANCIA) por la misma red, usando el alias de su haproxy.
-# Sin volúmenes: no guarda nada.
+# No guarda nada en disco. Solo monta, de solo lectura, el certificado de acceso (firma la solicitud de firma) y la raíz de confianza.
 #
 #   ./levantar.sh, o ya creado: docker compose -p contratacion --env-file .env logs -f
 name: contratacion
@@ -18,6 +18,20 @@ services:
       VERIFIER_API: http://verifier-${VERIFIER_INSTANCIA}/verifier-${VERIFIER_INSTANCIA}
       NOMBRE_EMPLEADOR: ${NOMBRE_EMPLEADOR}
       PUERTO: "80"
+      # Certificado de acceso del empleador (el de su verifier): firma la solicitud de firma que lee la wallet.
+      CLAVE_ACCESO: /secretos/acceso.key
+      CADENA_ACCESO: /secretos/cadena.pem
+      # Raíz con la que se comprueban las firmas y los sellos de tiempo que devuelve la wallet.
+      RAIZ_CONFIANZA: /pki/root.crt
+      # Autoridad de sellado de tiempo (srv-andes-scd, por la red interna): el portal sella las firmas que recibe.
+      TSA_URL: ${TSA_URL:-http://app-andes-scd/andes-scd/tsa}
+    volumes:
+      - ../_comun/instancias/${VERIFIER_INSTANCIA}/secretos/acceso.key:/secretos/acceso.key:ro
+      - ../_comun/instancias/${VERIFIER_INSTANCIA}/secretos/cadena.pem:/secretos/cadena.pem:ro
+      - ../../srv-tl-publisher/pki/publico/ca/root.crt:/pki/root.crt:ro
+    # El contenedor es de solo lectura: openssl necesita un /tmp para los archivos de cada comprobación.
+    tmpfs:
+      - /tmp
     networks:
       avance-eudi:
         aliases: ["app-${PREFIJO}"]

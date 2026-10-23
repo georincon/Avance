@@ -101,6 +101,13 @@
   .compartido header { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: none; border: 0; flex-wrap: wrap; }
   .compartido h3 { margin: 12px 0 2px; }
   .compartido .acciones { margin-top: 12px; }
+  a.enlace { color: var(--azul); font-weight: 700; }
+  a.enlace.boton { display: inline-block; text-decoration: none; background: var(--azul); color: #fff; border-radius: 10px; padding: 10px 18px; }
+  a.enlace.boton:hover { background: var(--azul-osc); }
+  .comprobaciones { list-style: none; margin: 6px 0 0; padding: 0; font-size: .92rem; }
+  .comprobaciones li { padding: 4px 0; } .comprobaciones .bien { color: var(--ok); } .comprobaciones .mal { color: var(--error); }
+  .comprobaciones small { color: var(--suave); }
+  #cargo { width: 100%; font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); }
   footer { background: var(--noche); color: #b9cfe6; }
   footer .in { max-width: 1120px; margin: 0 auto; padding: 26px 20px; display: flex; gap: 20px; align-items: center; font-size: .88rem; }
   footer img { width: 56px; height: 56px; border-radius: 10px; background: #fff; flex: none; }
@@ -158,6 +165,7 @@
   let sondeo = null, cuenta = null
   const verificados = new Map()   // clave de nivel -> { nivel, id, formacion, identidad, hora } (solo en memoria)
   let tarjetas = []
+  let firmaDisponible = false
 
   function el(tag, props = {}, ...hijos) {
     const e = document.createElement(tag)
@@ -226,6 +234,8 @@
       id: paso === 'formacion' ? id : previo?.id ?? id,
       formacion: r.formacion ?? previo?.formacion,
       identidad: r.identidad ?? previo?.identidad,
+      idIdentidad: paso === 'identidad' ? id : previo?.idIdentidad,
+      contrato: previo?.contrato,
       hora: previo?.hora ?? new Date(),
     })
     modal.close()
@@ -241,7 +251,7 @@
     }
     const lista = $('lista-compartidos')
     $('compartidos').hidden = verificados.size === 0
-    lista.replaceChildren(...[...verificados.values()].map(({ nivel, id, formacion: f, identidad: i, hora }) => {
+    lista.replaceChildren(...[...verificados.values()].map(({ nivel, id, formacion: f, identidad: i, hora, idIdentidad, contrato }) => {
       const hijos = [
         el('header', {}, el('div', {}, el('h3', { style: 'margin:0;text-transform:none;letter-spacing:0;font-size:1.1rem;color:inherit' }, `${nivel.nombre} · graduado/a`),
           el('span', { class: 'sub' }, `Verificado a las ${hora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })} · credencial de ${f?.institucion ?? 'la universidad'}`)), el('span', { class: 'sello' }, '✔ Verificado')),
@@ -251,10 +261,98 @@
       if (i) hijos.push(el('h3', {}, 'Identidad compartida'), el('dl', {}, fila('Nombres', i.nombres), fila('Apellidos', i.apellidos), fila('Documento', `${i.tipo_documento ? i.tipo_documento + ' ' : ''}${i.documento}`)))
       const acciones = [el('button', { class: 's', onclick: () => { verificados.delete(nivel.clave); pintar() } }, 'Quitar de la pantalla')]
       if (!i) acciones.unshift(el('button', { class: 'p', onclick: () => iniciar(nivel, 'identidad', id) }, 'Confirmar identidad (opcional)'))
+      if (i && contrato) {
+        hijos.push(el('h3', {}, 'Contrato de trabajo'),
+          el('dl', {}, fila('Cargo', contrato.cargo), fila('Firmado por', contrato.verificacion.firmante?.nombre), fila('Sello de tiempo', contrato.verificacion.sello?.fecha ? new Date(contrato.verificacion.sello.fecha).toLocaleString('es-CO') : 'Sin sello')),
+          el('div', { class: 'acciones' }, el('span', { class: 'sello' }, '✔ Contrato firmado y verificado'), el('a', { class: 'enlace', href: contrato.descargar }, 'Descargar PDF firmado')))
+      } else if (i && firmaDisponible) {
+        acciones.unshift(el('button', { class: 'p', onclick: () => firmarContrato(nivel, idIdentidad) }, 'Firmar contrato de trabajo'))
+      }
       hijos.push(el('div', { class: 'acciones' }, ...acciones))
       return el('article', { class: 'compartido' + (nivel.clave === nuevo ? ' nuevo' : '') }, ...hijos)
     }))
     if (nuevo) lista.querySelector('.nuevo')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  // --- Contrato: pedir el cargo, mostrar el QR de firma y esperar el PDF firmado ------------------------
+  function firmarContrato(nivel, idIdentidad) {
+    parar()
+    const cargo = el('input', { type: 'text', id: 'cargo', maxlength: '80', placeholder: 'Por ejemplo: Ingeniero/a de sistemas', autocomplete: 'off' })
+    const aviso = el('p', { class: 'sub', style: 'color:var(--error);min-height:1.4em' })
+    const enviar = async () => {
+      aviso.textContent = ''
+      const { ok, cuerpo } = await api('/api/contrato', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ previa: idIdentidad, cargo: cargo.value }) })
+      if (!ok) { aviso.textContent = cuerpo.error ?? 'No se pudo crear el contrato.'; return }
+      mostrarQrFirma(nivel, idIdentidad, cuerpo)
+    }
+    cargo.addEventListener('keydown', (e) => { if (e.key === 'Enter') enviar() })
+    contenido.replaceChildren(
+      el('h2', { id: 'titulo' }, 'Contrato de trabajo'),
+      el('p', { class: 'sub' }, 'Se generará el contrato con la formación y la identidad ya verificadas, para que la persona lo firme desde su wallet.'),
+      el('label', { for: 'cargo', style: 'font-weight:700;display:block;margin-bottom:6px' }, 'Cargo'), cargo, aviso,
+      el('div', { class: 'acciones' }, el('button', { class: 's', onclick: cerrar }, 'Cancelar'), el('button', { class: 'p', onclick: enviar }, 'Generar contrato y código')),
+    )
+    if (!modal.open) modal.showModal()
+    cargo.focus()
+  }
+
+  function mostrarQrFirma(nivel, idIdentidad, s) {
+    const restante = el('div', { class: 'cuenta' })
+    contenido.replaceChildren(
+      el('h2', { id: 'titulo' }, 'Firmar el contrato'),
+      el('p', { class: 'sub' }, 'La persona escanea este código con su wallet para firmar el contrato.'),
+      el('img', { class: 'qr', src: s.qr, alt: 'Código QR para firmar con la wallet' }),
+      restante,
+      el('ol', { class: 'pasos' },
+        el('li', {}, 'En la wallet: Inicio → Firmar → Escanear QR.'),
+        el('li', {}, 'Revisa el contrato y elige el servicio de firma.'),
+        el('li', {}, 'Autoriza la firma con tu PIN. El resultado aparece aquí.')),
+      el('div', { class: 'pide' }, el('b', {}, 'Documento: '), `${s.documento.etiqueta} (${Math.round(s.documento.bytes / 1024)} KB) · `, el('a', { class: 'enlace', href: s.documento.ver, target: '_blank', rel: 'noopener' }, 'ver el contrato'), el('br'),
+        el('b', {}, 'Huella SHA-256: '), s.documento.sha256),
+      el('p', { class: 'sub', style: 'font-size:.82rem' }, 'Firma electrónica de prueba del ecosistema de pruebas: sin validez legal.'),
+      el('div', { class: 'acciones' }, el('button', { class: 's', onclick: () => navigator.clipboard?.writeText(s.enlace) }, 'Copiar enlace'), el('button', { class: 's', onclick: cerrar }, 'Cancelar')),
+    )
+    const limite = Date.now() + s.vence_en * 1000
+    cuenta = setInterval(() => {
+      const seg = Math.max(0, Math.round((limite - Date.now()) / 1000))
+      restante.textContent = `El código vence en ${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`
+    }, 1000)
+    sondeo = setInterval(async () => {
+      const { cuerpo } = await api('/api/firma/' + s.id)
+      if (cuerpo.estado === 'firmado') { parar(); contratoFirmado(nivel, cuerpo) }
+      else if (cuerpo.estado === 'invalida') { parar(); mostrarFirmaInvalida(nivel, idIdentidad, cuerpo.verificacion) }
+      else if (cuerpo.estado === 'rechazada') { parar(); mostrarError(cuerpo.motivo, nivel, 'contrato', idIdentidad) }
+    }, 2000)
+  }
+
+  const listaComprobaciones = (v) => el('ul', { class: 'comprobaciones' }, (v?.comprobaciones ?? []).map((c) =>
+    el('li', { class: c.ok ? 'bien' : 'mal' }, `${c.ok ? '✔' : '✖'} ${c.texto}`, c.detalle ? el('small', {}, ` — ${c.detalle}`) : null)))
+
+  function contratoFirmado(nivel, r) {
+    const v = verificados.get(nivel.clave)
+    if (v) v.contrato = { cargo: r.cargo, verificacion: r.verificacion, descargar: BASE + r.descargar.replace(BASE, '') }
+    const f = r.verificacion
+    contenido.replaceChildren(
+      el('span', { class: 'sello' }, '✔ Contrato firmado'),
+      el('h2', { id: 'titulo' }, 'Contrato firmado y verificado'),
+      el('p', { class: 'sub' }, 'La wallet devolvió el contrato firmado y el portal comprobó la firma.'),
+      el('dl', {}, fila('Firmado por', f.firmante?.nombre), fila('Documento', f.firmante?.documento), fila('Certificado emitido por', f.firmante?.emisor),
+        fila('Sello de tiempo', f.sello?.fecha ? new Date(f.sello.fecha).toLocaleString('es-CO') : 'Sin sello')),
+      el('h3', {}, 'Lo que se comprobó'), listaComprobaciones(f),
+      f.selloAnadidoPorPortal ? el('p', { class: 'sub', style: 'font-size:.85rem;margin-top:8px' }, 'El sello de tiempo lo añadió este portal al recibir la firma, porque la wallet firma en nivel básico (sin sello).') : null,
+      el('div', { class: 'acciones' }, el('button', { class: 's', onclick: () => { cerrar(); pintar() } }, 'Cerrar'), el('a', { class: 'enlace boton', href: BASE + r.descargar.replace(BASE, '') }, 'Descargar PDF firmado')),
+    )
+    pintar()
+  }
+
+  function mostrarFirmaInvalida(nivel, idIdentidad, verificacion) {
+    contenido.replaceChildren(
+      el('span', { class: 'sello mal' }, '✖ Firma no válida'),
+      el('h2', { id: 'titulo' }, 'La firma recibida no es válida'),
+      el('p', { class: 'sub' }, 'La wallet devolvió un documento, pero no pasó las comprobaciones:'),
+      listaComprobaciones(verificacion),
+      el('div', { class: 'acciones' }, el('button', { class: 's', onclick: cerrar }, 'Cerrar'), el('button', { class: 'p', onclick: () => firmarContrato(nivel, idIdentidad) }, 'Intentar de nuevo')),
+    )
   }
 
   function mostrarError(motivo, nivel, paso, previa) {
@@ -262,11 +360,12 @@
       el('span', { class: 'sello mal' }, '✖ No verificado'),
       el('h2', { id: 'titulo' }, 'No se pudo verificar'),
       el('p', { class: 'sub' }, motivo),
-      el('div', { class: 'acciones' }, el('button', { class: 's', onclick: cerrar }, 'Cerrar'), el('button', { class: 'p', onclick: () => iniciar(nivel, paso, previa) }, 'Generar un código nuevo')),
+      el('div', { class: 'acciones' }, el('button', { class: 's', onclick: cerrar }, 'Cerrar'), el('button', { class: 'p', onclick: () => paso === 'contrato' ? firmarContrato(nivel, previa) : iniciar(nivel, paso, previa) }, 'Generar un código nuevo')),
     )
   }
 
   api('/api/niveles').then(({ cuerpo }) => {
+    firmaDisponible = Boolean(cuerpo.firma)
     tarjetas = [...cuerpo.niveles].reverse().map((n, i) => {
       const boton = el('button', { class: 'nivel', role: 'listitem', 'data-n': String(i + 1), style: `--i:${i}` })
       boton.addEventListener('click', () => { if (n.disponible && !verificados.has(n.clave)) iniciar(n) })

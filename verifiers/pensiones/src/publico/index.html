@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{NOMBRE}} · Prueba de supervivencia</title>
+<link rel="icon" href="{{BASE}}/publico/marca.svg">
+<style>
+  :root { --azul: #0b2a5b; --azul-2: #123a7a; --amarillo: #ffd200; --amarillo-osc: #e6bc00; --gris: #f1f2f4; --linea: #dcdfe4; --tinta: #1f2937; --suave: #5f6b7a; --ok: #146c3a; --ok-f: #e6f4ea; --mal: #b3261e; --mal-f: #fdecea; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--tinta); background: #fff; font: 16px/1.5 "Montserrat", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; }
+  a { color: inherit; text-decoration: none; }
+  .contenedor { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  /* franja superior */
+  .franja { background: var(--azul); color: #cfd9ec; font-size: .78rem; } .franja .contenedor { display: flex; justify-content: space-between; gap: 16px; padding-top: 7px; padding-bottom: 7px; flex-wrap: wrap; } .franja b { color: var(--amarillo); }
+  /* cabecera */
+  header { background: #fff; border-bottom: 1px solid var(--linea); position: sticky; top: 0; z-index: 5; }
+  .cab { display: flex; align-items: center; gap: 28px; padding-top: 12px; padding-bottom: 12px; }
+  .marca { display: flex; align-items: center; gap: 10px; } .marca img { width: 46px; height: 46px; } .marca strong { display: block; color: var(--azul); font-size: 1.2rem; line-height: 1.05; font-weight: 800; } .marca small { color: var(--suave); font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; }
+  nav { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; } nav a { padding: 9px 13px; border-radius: 6px; font-weight: 600; font-size: .92rem; color: var(--azul); } nav a:hover, nav a.activo { background: var(--gris); } nav a.activo { box-shadow: inset 0 -3px 0 var(--amarillo); border-radius: 6px 6px 0 0; }
+  /* héroe */
+  .heroe { background: linear-gradient(110deg, var(--azul) 0%, var(--azul-2) 60%, #1f56a8 100%); color: #fff; position: relative; overflow: hidden; }
+  .heroe::after { content: ""; position: absolute; right: -90px; top: -90px; width: 380px; height: 380px; border-radius: 50%; background: var(--amarillo); opacity: .95; }
+  .heroe::before { content: ""; position: absolute; right: 150px; bottom: -120px; width: 240px; height: 240px; border-radius: 50%; background: rgba(255,255,255,.08); }
+  .heroe .contenedor { position: relative; z-index: 1; padding-top: 54px; padding-bottom: 60px; display: grid; grid-template-columns: 1.2fr .8fr; gap: 30px; align-items: center; }
+  @media (max-width: 860px) { .heroe .contenedor { grid-template-columns: 1fr; } .heroe::after { width: 220px; height: 220px; right: -70px; top: -70px; } }
+  .insignia { display: inline-block; background: var(--amarillo); color: var(--azul); font-weight: 800; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; padding: 5px 12px; border-radius: 4px; margin-bottom: 14px; }
+  .heroe h1 { font-size: clamp(1.9rem, 4.2vw, 2.9rem); line-height: 1.1; margin: 0 0 14px; font-weight: 800; } .heroe p { max-width: 54ch; color: #d6e0f3; margin: 0 0 22px; font-size: 1.05rem; }
+  .tarjeta-hero { background: #fff; color: var(--tinta); border-radius: 12px; padding: 20px 22px; box-shadow: 0 14px 40px rgba(0,0,0,.25); border-top: 6px solid var(--amarillo); } .tarjeta-hero h3 { margin: 0 0 8px; color: var(--azul); font-size: 1.05rem; } .tarjeta-hero ol { margin: 0; padding-left: 20px; font-size: .92rem; } .tarjeta-hero li { margin: 6px 0; }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 6px; font-weight: 700; } button:focus-visible, a:focus-visible { outline: 3px solid var(--azul); outline-offset: 3px; }
+  .sol { background: var(--amarillo); color: var(--azul); padding: 14px 28px; font-size: 1rem; box-shadow: 0 3px 0 var(--amarillo-osc); } .sol:hover { background: #ffdc33; }
+  .claro { background: #fff; color: var(--azul); border: 1px solid var(--linea); padding: 10px 18px; } .claro:hover { border-color: var(--azul); }
+  /* accesos rápidos */
+  .accesos { margin-top: -30px; position: relative; z-index: 2; } .accesos .contenedor { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; } @media (max-width: 860px) { .accesos .contenedor { grid-template-columns: repeat(2, 1fr); } }
+  .acceso { background: #fff; border: 1px solid var(--linea); border-radius: 10px; padding: 16px; box-shadow: 0 6px 18px rgba(11,42,91,.08); display: flex; gap: 12px; align-items: center; border-bottom: 4px solid var(--amarillo); }
+  .acceso.principal { background: var(--azul); color: #fff; border-color: var(--amarillo); } .acceso .ic { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--gris); display: grid; place-items: center; color: var(--azul); } .acceso.principal .ic { background: var(--amarillo); }
+  .acceso b { display: block; font-size: .92rem; line-height: 1.2; } .acceso span { font-size: .76rem; opacity: .75; }
+  /* contenido */
+  main { padding: 40px 0 56px; } .rejilla { display: grid; grid-template-columns: 1.4fr 1fr; gap: 22px; align-items: start; } @media (max-width: 900px) { .rejilla { grid-template-columns: 1fr; } }
+  h2.seccion { margin: 0 0 14px; color: var(--azul); font-size: 1.4rem; font-weight: 800; } h2.seccion::after { content: ""; display: block; width: 46px; height: 4px; background: var(--amarillo); margin-top: 6px; border-radius: 2px; }
+  .panel { background: #fff; border: 1px solid var(--linea); border-radius: 10px; padding: 22px; margin-bottom: 18px; } .panel h2 { margin: 0 0 6px; font-size: 1.2rem; color: var(--azul); } .sub { color: var(--suave); margin: 0 0 14px; font-size: .92rem; }
+  .veredicto { display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: 8px; font-weight: 800; font-size: 1.1rem; margin-bottom: 8px; background: var(--ok-f); color: var(--ok); } .veredicto.no { background: var(--mal-f); color: var(--mal); }
+  .criterio { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--linea); } .criterio:last-of-type { border-bottom: 0; }
+  .criterio .m { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: .8rem; background: var(--ok); } .criterio.no .m { background: var(--mal); }
+  .criterio b { display: block; } .criterio span { color: var(--suave); font-size: .88rem; }
+  dl { margin: 12px 0 0; } .fila { display: flex; justify-content: space-between; gap: 18px; padding: 8px 0; border-bottom: 1px solid var(--linea); } .fila:last-child { border-bottom: 0; } dt { color: var(--suave); } dd { margin: 0; text-align: right; font-weight: 700; }
+  ul.lista { list-style: none; margin: 0; padding: 0; } ul.lista li { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--linea); } ul.lista li:last-child { border-bottom: 0; } ul.lista small { color: var(--suave); display: block; }
+  .vacio { color: var(--suave); text-align: center; padding: 16px 0; }
+  .aviso { background: #fff8d6; border: 1px solid #ecd978; color: #6b5a05; border-radius: 8px; padding: 10px 14px; font-size: .9rem; margin: 10px 0; }
+  .noticias { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 34px; } @media (max-width: 860px) { .noticias { grid-template-columns: 1fr; } }
+  .noticia { background: var(--gris); border-radius: 10px; padding: 18px; border-left: 5px solid var(--amarillo); } .noticia small { color: var(--suave); } .noticia b { display: block; color: var(--azul); margin: 4px 0; }
+  dialog { border: 0; border-radius: 12px; padding: 0; width: min(480px, calc(100vw - 28px)); box-shadow: 0 24px 70px rgba(0,0,0,.4); border-top: 6px solid var(--amarillo); } dialog::backdrop { background: rgba(11,42,91,.72); }
+  .modal { padding: 26px; text-align: center; } .modal h2 { margin: 0 0 4px; color: var(--azul); } .modal .qr { width: 250px; max-width: 100%; border: 1px solid var(--linea); border-radius: 10px; padding: 6px; margin: 10px auto; display: block; }
+  .pide { text-align: left; background: var(--gris); border-radius: 8px; padding: 10px 14px; font-size: .86rem; color: var(--suave); margin: 10px 0; } .pide b { color: var(--tinta); } .cuenta { color: var(--suave); font-size: .85rem; min-height: 1.3em; }
+  .acciones { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  footer { background: var(--azul); color: #b9c6e0; font-size: .85rem; border-top: 6px solid var(--amarillo); } footer .contenedor { padding-top: 26px; padding-bottom: 26px; display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 20px; } @media (max-width: 860px) { footer .contenedor { grid-template-columns: 1fr; } } footer b { color: #fff; display: block; margin-bottom: 6px; } footer a { display: block; padding: 2px 0; }
+</style>
+</head>
+<body>
+<div class="franja"><div class="contenedor"><span><b>Entidad ficticia</b> · para probar el ecosistema EUDI Wallet</span><span>Línea de atención de prueba · 000 0000</span></div></div>
+<header><div class="contenedor cab">
+  <a class="marca" href="{{BASE}}/"><img src="{{BASE}}/publico/marca.svg" alt=""><div><strong>{{NOMBRE}}</strong><small>Pensiones y cesantías</small></div></a>
+  <nav aria-label="Principal"><a href="#">Inicio</a><a href="#">Pensionados</a><a href="#">Afiliados</a><a class="activo" href="#prueba">Prueba de supervivencia</a><a href="#">Ayuda</a></nav>
+</div></header>
+<section class="heroe">
+  <div class="contenedor">
+    <div>
+      <span class="insignia">Servicio digital</span>
+      <h1>Compruebe que está con vida sin filas ni papeles</h1>
+      <p>Para seguir recibiendo su mesada, {{NOMBRE}} necesita saber que usted está con vida. Con su <b>fe de vida notarial</b> y su documento de identidad en la wallet, lo hace en segundos.</p>
+      <button class="sol" id="comprobar">Comprobar mi supervivencia</button>
+    </div>
+    <div class="tarjeta-hero"><h3>¿Cómo funciona?</h3><ol><li>Pida su fe de vida en una notaría (vale 30 días) y recíbala en la wallet.</li><li>Aquí escanee un código con la wallet.</li><li>El fondo comprueba que la constancia es de una notaría de confianza, está vigente y es suya.</li></ol></div>
+  </div>
+</section>
+<section class="accesos"><div class="contenedor">
+  <a class="acceso principal" href="#prueba"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0b2a5b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.600-9-9.200C1.800 8.200 3.900 5 7 5c2 0 3.400 1.100 5 3 1.600-1.900 3-3 5-3 3.100 0 5.200 3.200 4 6.800C19 16.400 12 21 12 21z"/></svg></span><div><b>Prueba de supervivencia</b><span>Disponible ahora</span></div></a>
+  <div class="acceso"><span class="ic">▤</span><div><b>Certificado de pensionado</b><span>Próximamente</span></div></div>
+  <div class="acceso"><span class="ic">$</span><div><b>Desprendible de mesada</b><span>Próximamente</span></div></div>
+  <div class="acceso"><span class="ic">?</span><div><b>Preguntas frecuentes</b><span>Próximamente</span></div></div>
+</div></section>
+<main id="prueba"><div class="contenedor">
+  <div class="rejilla">
+    <div><h2 class="seccion">Resultado de la comprobación</h2><div id="resultado"><div class="panel"><p class="sub">Aquí aparece el resultado.</p><div class="aviso">Se pide la fe de vida (titular, vigencia, constancia) y, del documento de identidad, solo nombre y número de documento. No se guarda nada.</div></div></div></div>
+    <div><h2 class="seccion">Registro de la jornada</h2><div class="panel"><p class="sub">Supervivencias acreditadas hoy (solo iniciales y últimos dígitos).</p><ul class="lista" id="registro"></ul><div class="vacio" id="vacio">Todavía no hay pruebas acreditadas.</div></div></div>
+  </div>
+  <div class="noticias">
+    <div class="noticia"><small>Aviso</small><b>La fe de vida vale 30 días</b>Haga la comprobación dentro de ese plazo.</div>
+    <div class="noticia"><small>Privacidad</small><b>No guardamos sus datos</b>Cierre la página y el resultado se borra.</div>
+    <div class="noticia"><small>Seguridad</small><b>Constancia verificable</b>Solo se aceptan constancias de notarías de confianza.</div>
+  </div>
+</div></main>
+<footer><div class="contenedor"><div><b>{{NOMBRE}}</b>Fondo ficticio para probar el ecosistema EUDI Wallet. No paga pensiones reales y sus resultados no tienen validez legal.</div><div><b>Servicios</b><a href="#prueba">Prueba de supervivencia</a><a href="#">Pensionados</a></div><div><b>Contacto</b><a href="#">Línea de prueba 000 0000</a><a href="#">Aviso de privacidad</a></div></div></footer>
+<dialog id="modal" aria-labelledby="m-titulo"><div class="modal" id="m"></div></dialog>
+<script>
+(() => {
+  const BASE = '{{BASE}}'
+  const $ = (id) => document.getElementById(id)
+  const modal = $('modal'), m = $('m')
+  let sondeo = null, cuenta = null
+  function el(tag, props = {}, ...hijos) {
+    const e = document.createElement(tag)
+    for (const [k, v] of Object.entries(props)) { if (k === 'class') e.className = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v) }
+    for (const h of hijos.flat()) if (h != null && h !== false) e.append(h.nodeType ? h : document.createTextNode(String(h)))
+    return e
+  }
+  const api = async (ruta, o = {}) => { const r = await fetch(BASE + ruta, o); return { ok: r.ok, cuerpo: await r.json().catch(() => ({})) } }
+  const parar = () => { clearInterval(sondeo); clearInterval(cuenta); sondeo = cuenta = null }
+  modal.addEventListener('close', parar)
+  const cerrar = () => { parar(); if (modal.open) modal.close() }
+  const fecha = (f) => (f ? new Date(`${f}T12:00:00Z`).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : '—')
+
+  async function comprobar() {
+    parar(); m.replaceChildren(el('p', { class: 'cuenta' }, 'Preparando el código…')); if (!modal.open) modal.showModal()
+    const { ok, cuerpo } = await api('/api/solicitud', { method: 'POST' })
+    if (!ok) { m.replaceChildren(el('h2', {}, 'No se pudo'), el('div', { class: 'aviso' }, cuerpo.error ?? 'Error'), el('div', { class: 'acciones' }, el('button', { class: 'claro', onclick: cerrar }, 'Cerrar'))); return }
+    const restante = el('div', { class: 'cuenta' })
+    m.replaceChildren(el('h2', { id: 'm-titulo' }, 'Prueba de supervivencia'), el('p', { class: 'cuenta' }, 'Escanea con tu wallet y elige tu fe de vida.'),
+      el('img', { class: 'qr', src: cuerpo.qr, alt: 'Código QR' }), restante,
+      el('div', { class: 'pide' }, el('b', {}, 'Se pide: '), 'tu fe de vida notarial (constancia, titular, vigencia) y, de tu documento de identidad, nombre y número de documento.'),
+      el('div', { class: 'acciones' }, el('button', { class: 'claro', onclick: () => navigator.clipboard?.writeText(cuerpo.enlace) }, 'Copiar enlace'), el('button', { class: 'claro', onclick: cerrar }, 'Cancelar')))
+    const limite = Date.now() + cuerpo.vence_en * 1000
+    cuenta = setInterval(() => { const s = Math.max(0, Math.round((limite - Date.now()) / 1000)); restante.textContent = `El código vence en ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }, 1000)
+    sondeo = setInterval(async () => {
+      const { cuerpo: r } = await api('/api/solicitud/' + cuerpo.id)
+      if (r.estado === 'listo') { parar(); modal.close(); mostrar(r.supervivencia); cargar() }
+      else if (r.estado === 'rechazada') { parar(); m.replaceChildren(el('h2', {}, 'No se pudo verificar'), el('div', { class: 'aviso' }, r.motivo), el('div', { class: 'acciones' }, el('button', { class: 'sol', onclick: comprobar }, 'Generar un código nuevo'), el('button', { class: 'claro', onclick: cerrar }, 'Cerrar'))) }
+    }, 2000)
+  }
+  function mostrar(s) {
+    $('resultado').replaceChildren(el('div', { class: 'panel' },
+      el('div', { class: `veredicto${s.acreditada ? '' : ' no'}` }, s.acreditada ? '✔' : '✖', s.acreditada ? 'Supervivencia acreditada: tu mesada sigue activa' : 'No se pudo acreditar la supervivencia'),
+      ...s.criterios.map((c) => el('div', { class: `criterio${c.cumple ? '' : ' no'}` }, el('div', { class: 'm' }, c.cumple ? '✔' : '✖'), el('div', {}, el('b', {}, c.nombre), el('span', {}, c.detalle)))),
+      el('dl', {}, el('div', { class: 'fila' }, el('dt', {}, 'Pensionado'), el('dd', {}, s.datos.pensionado)), el('div', { class: 'fila' }, el('dt', {}, 'Documento'), el('dd', {}, s.datos.documento)),
+        el('div', { class: 'fila' }, el('dt', {}, 'Diligencia notarial'), el('dd', {}, fecha(s.datos.diligencia))), el('div', { class: 'fila' }, el('dt', {}, 'Constancia n.º'), el('dd', {}, s.datos.notaria_numero)),
+        el('div', { class: 'fila' }, el('dt', {}, 'Próxima prueba antes del'), el('dd', {}, fecha(s.datos.vence)))),
+      s.acreditada ? el('div', { class: 'aviso' }, 'La mesada del próximo mes queda habilitada (simulado). No se guarda ningún dato: cierra la página y se borra.') : null,
+      el('div', { class: 'acciones', style: 'justify-content:flex-start' }, el('button', { class: 'sol', onclick: comprobar }, 'Comprobar otra persona'))))
+  }
+  async function cargar() {
+    const { cuerpo } = await api('/api/acreditados')
+    const l = cuerpo.acreditados ?? []
+    $('vacio').hidden = l.length > 0
+    $('registro').replaceChildren(...l.map((x) => el('li', {}, el('div', {}, el('b', {}, x.pensionado), el('small', {}, `Documento ${x.documento} · próxima antes del ${fecha(x.vence)}`)), el('small', {}, new Date(x.hora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })))))
+  }
+  $('comprobar').addEventListener('click', comprobar); cargar()
+})()
+</script>
+</body>
+</html>

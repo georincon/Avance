@@ -39,6 +39,8 @@ services:
   tlp-db:
     image: ${TLP_DB_IMAGE}
     container_name: tlp-db
+    ports:
+      - "127.0.0.1:${TLP_DB_PORT:-3307}:3306"
     restart: unless-stopped
     environment:
       - MYSQL_ROOT_PASSWORD=${TLP_DB_ROOT_PASSWORD}

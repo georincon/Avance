@@ -261,7 +261,7 @@ export function crearEmisor({ url, aerolinea, firmante, tramites, estado, abca, 
 
     const tramite = tramites.buscar(t.numero)
     if (!tramite) throw new ErrorOAuth(400, 'invalid_credential_request', 'el trámite ya no existe')
-    if (tramite.estado === 'anulado') throw new ErrorOAuth(400, 'invalid_credential_request', 'el trámite fue anulado')
+    if (tramite.estado !== 'vigente') throw new ErrorOAuth(400, 'invalid_credential_request', 'el tiquete fue cancelado o ya se usó')
     const doc = porConfiguracion(t.configuracion)
     const datos = datosDelDocumento(tramite, aerolinea)
 

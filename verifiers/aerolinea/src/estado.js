@@ -9,7 +9,9 @@
 import { deflateSync } from 'node:zlib'
 import { SignJWT } from 'jose'
 
-const VALIDEZ_S = 10 * 60 // el token dura 10 min: una anulación se ve como mucho 10 min después
+// El token dura 1 min: un tiquete usado o cancelado deja de valer para los verifiers en menos de un minuto (con 10 min, uno recién
+// usado todavía se habría podido presentar de nuevo). Es un ejemplo: una aerolínea real tendría su propio control de uso.
+const VALIDEZ_S = 60
 
 export function crearEstado({ firmante, uri, anulados }) {
   let cache = null

@@ -88,7 +88,7 @@ fi
 
 echo "▸ Verifier de la notaría (verifier-$VERIFIER_INSTANCIA)"
 VERIFIER_NOMBRE="$NOTARIA_NOMBRE" VERIFIER_PROPOSITO="$PROPOSITO" CONSERVAR_PRESENTACIONES=PT30M VIGENCIA_SOLICITUD=PT5M \
-  WRPRC_VCTS="urn:eudi:pid:1,urn:co:notaria:declaracion-extraproceso:1,urn:co:notaria:poder-especial:1,urn:co:notaria:reconocimiento-documento:1,urn:co:notaria:fe-de-vida:1,urn:co:notaria:autenticacion-firma:1,urn:co:notaria:permiso-salida-menor:1" \
+  WRPRC_VCTS="urn:eudi:pid:1,urn:co:notaria:declaracion-extraproceso:1,urn:co:notaria:poder-especial:1,urn:co:notaria:reconocimiento-documento:1,urn:co:notaria:fe-de-vida:1,urn:co:notaria:autenticacion-firma:1,urn:co:notaria:permiso-salida-menor:1,urn:co:notaria:copia-escritura:1,urn:co:notaria:convivencia:1,urn:co:notaria:registro-civil:1" \
   ../_comun/levantar.sh "$VERIFIER_INSTANCIA" \
   | sed 's/^/  │ /'
 

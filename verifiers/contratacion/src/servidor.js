@@ -14,17 +14,25 @@
 // Privacidad: no se guarda nada en disco ni en el log (solo «nivel, resultado»). Los resultados viven en memoria
 // unos minutos para mostrarse y se borran.
 //
+// Contrato y firma (paso 3): con la formación y la identidad ya verificadas, el portal genera el contrato de
+// trabajo en PDF y se lo ofrece a la persona para que lo firme desde su wallet ("Firmar → Escanear QR"). La
+// wallet firma con su prestador de firma remota y devuelve el PDF firmado; el portal comprueba la firma y el
+// sello de tiempo. Ver firma.js. Se activa si hay certificado de acceso (CLAVE_ACCESO / CADENA_ACCESO).
+//
 // Variables de entorno (las pone compose.yml a partir de .env):
 //   URL_PUBLICA      https://civica-desarrollo.avance.org.co/contratacion (el servidor escucha bajo esa ruta)
 //   VERIFIER_API     http://verifier-contratacion/verifier-contratacion (red interna)
 //   NOMBRE_EMPLEADOR el nombre que se muestra
 //   PUERTO           puerto interno (80: srv-nw-nginx llama a app-contratacion:80)
+//   CLAVE_ACCESO, CADENA_ACCESO   clave y cadena del certificado de acceso del empleador (firman la solicitud)
+//   RAIZ_CONFIANZA   raíz en la que se confía para comprobar las firmas recibidas
 
 import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import express from 'express'
 import QRCode from 'qrcode'
 import { crearVerifier } from './verifier.js'
+import { cargarAcceso, crearContratoPdf, crearSolicitudJar, enlaceFirma, huella, nuevoId, sellarFirmado, verificarFirmado } from './firma.js'
 
 const requerida = (n) => process.env[n] || (() => { throw new Error(`Falta la variable de entorno ${n}`) })()
 const URL_PUBLICA = requerida('URL_PUBLICA').replace(/\/$/, '')
@@ -56,13 +64,36 @@ const PEDIDOS = {
   identidad: ['given_name', 'family_name', 'identification_type', 'document_number'],
 }
 
+const VENCE_FIRMA_MS = 5 * 60 * 1000
+let acceso = null
+try {
+  if (process.env.CLAVE_ACCESO && process.env.CADENA_ACCESO) {
+    acceso = cargarAcceso({ clave: process.env.CLAVE_ACCESO, cadena: process.env.CADENA_ACCESO })
+  }
+} catch (e) {
+  console.error(`Firma de contratos desactivada: ${e.message}`)
+}
+const RAIZ = process.env.RAIZ_CONFIANZA
+// Autoridad de sellado de tiempo (RFC 3161). El SDK de la wallet firma sin sello; el portal se lo añade.
+const TSA_URL = process.env.TSA_URL
+
+async function pedirSello(consulta) {
+  const r = await fetch(TSA_URL, { method: 'POST', headers: { 'content-type': 'application/timestamp-query' }, body: consulta, signal: AbortSignal.timeout(15000) })
+  if (!r.ok) throw new Error(`la autoridad de sellado respondió ${r.status}`)
+  return Buffer.from(await r.arrayBuffer())
+}
+
 const verifier = crearVerifier({ api: requerida('VERIFIER_API') })
 const solicitudes = new Map() // id → { paso, nivel, transaccion, creada, final?, previa? }
+const firmas = new Map() // id → { pdf, etiqueta, state, nonce, creada, estado, resultado?, firmado? }
 
 setInterval(() => {
   const ahora = Date.now()
   for (const [id, s] of solicitudes) {
     if (ahora - (s.finalizada ?? s.creada) > CONSERVA_RESULTADO_MS) solicitudes.delete(id)
+  }
+  for (const [id, f] of firmas) {
+    if (ahora - (f.terminada ?? f.creada) > CONSERVA_RESULTADO_MS) firmas.delete(id)
   }
 }, 60 * 1000).unref()
 
@@ -140,6 +171,7 @@ r.get('/api/niveles', (_req, res) => res.json({
   niveles: NIVELES.map(({ clave, nombre, disponible, nota }) => ({ clave, nombre, disponible: disponible !== false, nota })),
   pide: PEDIDOS,
   estado: ESTADO_EXIGIDO,
+  firma: Boolean(acceso),
 }))
 
 // Crea la solicitud de un nivel (paso 'formacion') o la confirmación de identidad (paso 'identidad', que
@@ -182,5 +214,115 @@ r.get('/api/solicitud/:id', async (req, res) => {
   }
 })
 
+// --- Contrato y firma ----------------------------------------------------------------------------
+const urlencoded = express.urlencoded({ extended: false, limit: '12mb' })
+
+// Crea el contrato con lo verificado y la solicitud de firma. `previa` es una verificación de identidad lista.
+r.post('/api/contrato', async (req, res) => {
+  if (!acceso) return res.status(503).json({ error: 'La firma de contratos no está disponible en este portal.' })
+  const { previa, cargo } = req.body ?? {}
+  const anterior = solicitudes.get(previa)
+  const resultado = anterior?.final
+  if (resultado?.estado !== 'listo' || !resultado.identidad || !resultado.formacion) {
+    return res.status(400).json({ error: 'Primero hay que verificar la formación y confirmar la identidad.' })
+  }
+  const puesto = String(cargo ?? '').trim()
+  if (puesto.length < 3 || puesto.length > 80) return res.status(400).json({ error: 'Escribe el cargo (3 a 80 caracteres).' })
+
+  const id = nuevoId()
+  const i = resultado.identidad
+  const pdf = crearContratoPdf({
+    empleador: NOMBRE, nombres: i.nombres, apellidos: i.apellidos, tipoDocumento: i.tipo_documento, documento: i.documento,
+    cargo: puesto, formacion: resultado.formacion,
+    fecha: new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Bogota' }),
+  })
+  const etiqueta = 'contrato-de-trabajo.pdf'
+  const state = randomBytes(12).toString('base64url')
+  const nonce = randomBytes(16).toString('base64url')
+  firmas.set(id, { pdf, etiqueta, state, nonce, creada: Date.now(), estado: 'esperando', persona: `${i.nombres} ${i.apellidos}`, cargo: puesto })
+  const enlace = enlaceFirma({ acceso, urlPublica: URL_PUBLICA, id })
+  console.log('[contrato] solicitud de firma creada')
+  res.json({
+    id, enlace, qr: await QRCode.toDataURL(enlace, { margin: 1, width: 360 }), vence_en: VENCE_FIRMA_MS / 1000,
+    documento: { etiqueta, bytes: pdf.length, sha256: huella(pdf), ver: `${BASE}/firma/documento/${id}.pdf` },
+  })
+})
+
+// Lo que la wallet lee al escanear: la solicitud firmada y el documento.
+r.get('/firma/solicitud/:id', (req, res) => {
+  const f = firmas.get(req.params.id)
+  if (!acceso || !f || f.estado !== 'esperando' || Date.now() - f.creada > VENCE_FIRMA_MS) return res.status(404).end()
+  const jwt = crearSolicitudJar({ acceso, urlPublica: URL_PUBLICA, id: req.params.id, pdf: f.pdf, etiqueta: f.etiqueta, nonce: f.nonce, state: f.state })
+  res.type('application/oauth-authz-req+jwt').set('Cache-Control', 'no-store').send(jwt)
+})
+r.get('/firma/documento/:id.pdf', (req, res) => {
+  const f = firmas.get(req.params.id)
+  if (!f) return res.status(404).end()
+  res.type('application/pdf').set('Cache-Control', 'no-store').set('Content-Disposition', `inline; filename="${f.etiqueta}"`).send(f.pdf)
+})
+
+// La wallet devuelve aquí el PDF firmado (direct_post: documentWithSignature = lista JSON de PDFs en base64).
+r.post('/firma/respuesta/:id', urlencoded, async (req, res) => {
+  const f = firmas.get(req.params.id)
+  if (!f || f.estado !== 'esperando') return res.status(404).json({ error: 'invalid_request' })
+  if (req.body?.state !== f.state) return res.status(400).json({ error: 'invalid_request', error_description: 'state no coincide' })
+  if (req.body?.error) {
+    f.estado = 'rechazada'; f.terminada = Date.now(); f.motivo = req.body.error === 'user_cancelled' ? 'La persona canceló la firma.' : `La wallet respondió con un error (${req.body.error}).`
+    console.log('[contrato] firma rechazada por la wallet')
+    return res.json({})
+  }
+  let firmado
+  try {
+    const lista = JSON.parse(req.body.documentWithSignature ?? '[]')
+    firmado = Buffer.from(String(lista[0] ?? ''), 'base64')
+  } catch { return res.status(400).json({ error: 'invalid_request', error_description: 'documentWithSignature no es válido' }) }
+  let verificacion = await verificarFirmado({ firmado, original: f.pdf, raiz: RAIZ })
+  // Firma válida pero sin sello (lo normal: el SDK firma en nivel básico): se le añade el sello de tiempo y se
+  // vuelve a comprobar TODO. Si el sello falla, se conserva la firma tal cual, sin sello.
+  if (verificacion.valida && !verificacion.sello && TSA_URL) {
+    try {
+      const sellado = await sellarFirmado({ firmado, pedirSello })
+      const nueva = await verificarFirmado({ firmado: sellado, original: f.pdf, raiz: RAIZ })
+      if (nueva.valida && nueva.sello) {
+        firmado = sellado
+        verificacion = { ...nueva, selloAnadidoPorPortal: true }
+      } else console.error('[contrato] el sello añadido no pasó la verificación; se conserva la firma sin sello')
+    } catch (e) {
+      console.error(`[contrato] no se pudo sellar: ${e.message}`)
+    }
+  }
+  f.verificacion = verificacion
+  f.terminada = Date.now()
+  if (!verificacion.valida) {
+    f.estado = 'invalida'
+    console.log('[contrato] firma recibida pero NO válida')
+    return res.status(400).json({ error: 'invalid_request', error_description: 'la firma no es válida' })
+  }
+  f.estado = 'firmado'
+  f.firmado = firmado
+  console.log(`[contrato] contrato firmado y verificado${verificacion.sello ? ' con sello de tiempo' : ' (sin sello)'}`)
+  res.json({})
+})
+
+r.get('/api/firma/:id', (req, res) => {
+  const f = firmas.get(req.params.id)
+  if (!f) return res.status(404).json({ estado: 'rechazada', motivo: 'Solicitud desconocida.' })
+  if (f.estado === 'esperando') {
+    if (Date.now() - f.creada > VENCE_FIRMA_MS) return res.json({ estado: 'rechazada', motivo: 'La solicitud venció. Genera un código nuevo.' })
+    return res.json({ estado: 'esperando' })
+  }
+  if (f.estado === 'rechazada') return res.json({ estado: 'rechazada', motivo: f.motivo })
+  if (f.estado === 'invalida') return res.json({ estado: 'invalida', verificacion: f.verificacion })
+  res.json({
+    estado: 'firmado', persona: f.persona, cargo: f.cargo, verificacion: f.verificacion,
+    descargar: `${BASE}/firma/firmado/${req.params.id}.pdf`, bytes: f.firmado.length,
+  })
+})
+r.get('/firma/firmado/:id.pdf', (req, res) => {
+  const f = firmas.get(req.params.id)
+  if (f?.estado !== 'firmado') return res.status(404).end()
+  res.type('application/pdf').set('Cache-Control', 'no-store').set('Content-Disposition', 'attachment; filename="contrato-de-trabajo-firmado.pdf"').send(f.firmado)
+})
+
 app.use(BASE || '/', r)
-app.listen(PUERTO, () => console.log(`${NOMBRE}: verificación académica en :${PUERTO}${BASE} (verifier ${process.env.VERIFIER_API})`))
+app.listen(PUERTO, () => console.log(`${NOMBRE}: verificación académica en :${PUERTO}${BASE} (verifier ${process.env.VERIFIER_API}; firma de contratos ${acceso ? 'activa' : 'desactivada'})`))

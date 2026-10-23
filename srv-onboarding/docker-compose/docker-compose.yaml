@@ -24,6 +24,8 @@ services:
   onboarding-postgres:
     image: postgres:16-alpine
     container_name: onboarding-postgres
+    ports:
+      - "127.0.0.1:${ONBOARDING_DB_PORT:-5436}:5432"
     environment:
       POSTGRES_DB: onboarding
       POSTGRES_USER: onboarding

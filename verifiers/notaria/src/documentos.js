@@ -101,6 +101,64 @@ export const DOCUMENTOS = {
       ['alcance', 'Alcance'],
     ],
   },
+  copia_escritura: {
+    fondo: 'notaria-copia-escritura.jpg',
+    configuracion: 'co.notaria.constancia_copia_escritura',
+    vct: 'urn:co:notaria:copia-escritura:1',
+    nombre: 'Constancia de copia de escritura',
+    descripcion: 'Constancia de que una copia coincide con la escritura pública que reposa en el protocolo (no es la escritura)',
+    color: '#5a4a2a',
+    datos: [
+      ...DATOS_NOTARIA,
+      ['solicitante_nombre', 'Solicitante'],
+      ['solicitante_documento', 'Documento del solicitante'],
+      ['escritura_numero', 'Escritura pública n.º'],
+      ['escritura_fecha', 'Fecha de la escritura'],
+      ['notaria_origen', 'Notaría de origen'],
+      ['documento_nombre', 'Copia'],
+      ['documento_sha256', 'Huella SHA-256 de la copia'],
+      ['documento_bytes', 'Tamaño (bytes)'],
+      ['alcance', 'Alcance'],
+    ],
+  },
+  registro_civil: {
+    fondo: 'notaria-registro-civil.jpg',
+    configuracion: 'co.notaria.registro_civil_nacimiento',
+    vct: 'urn:co:notaria:registro-civil:1',
+    nombre: 'Registro civil de nacimiento',
+    descripcion: 'Inscripción del nacimiento de un hijo o hija, declarada por su padre o madre',
+    color: '#2f6b4f',
+    datos: [
+      ...DATOS_NOTARIA,
+      ['inscrito_nombre', 'Inscrito(a)'],
+      ['inscrito_documento', 'Serial / NUIP del registro'],
+      ['fecha_nacimiento', 'Fecha de nacimiento'],
+      ['lugar_nacimiento', 'Lugar de nacimiento'],
+      ['sexo', 'Sexo'],
+      ['progenitor_nombre', 'Declarante'],
+      ['progenitor_documento', 'Documento del declarante'],
+      ['calidad', 'En calidad de'],
+      ['otro_progenitor', 'Otro progenitor'],
+    ],
+  },
+  convivencia: {
+    fondo: 'notaria-convivencia.jpg',
+    configuracion: 'co.notaria.declaracion_convivencia',
+    vct: 'urn:co:notaria:convivencia:1',
+    nombre: 'Declaración de convivencia',
+    descripcion: 'Declaración extraproceso de que el declarante convive con una persona (para afiliarla como beneficiaria en una EPS)',
+    color: '#7a3b4f',
+    validezDias: 90,
+    datos: [
+      ...DATOS_NOTARIA,
+      ['declarante_nombre', 'Declarante'],
+      ['declarante_documento', 'Documento del declarante'],
+      ['companero_nombre', 'Compañero(a) permanente'],
+      ['companero_documento', 'Documento del compañero(a)'],
+      ['convivencia_desde', 'Convive desde'],
+      ['vigente_hasta', 'Válida hasta'],
+    ],
+  },
   permiso_menor: {
     fondo: 'notaria-permiso-menor.jpg',
     configuracion: 'co.notaria.permiso_salida_menor',
@@ -171,6 +229,28 @@ export function datosDelDocumento(tramite, notaria) {
         documento_nombre: d.documento_nombre, documento_sha256: d.documento_sha256, documento_bytes: d.documento_bytes,
         alcance: 'Testimonio de que la firma corresponde a quien firma. No equivale a reconocimiento ni da mayor fuerza al documento (Decreto-Ley 960 de 1970, art. 77).',
       }
+    case 'copia_escritura':
+      return {
+        ...base, solicitante_nombre: nombre, solicitante_documento: p.documento,
+        escritura_numero: d.escritura_numero, escritura_fecha: d.escritura_fecha, notaria_origen: d.notaria_origen,
+        documento_nombre: d.documento_nombre, documento_sha256: d.documento_sha256, documento_bytes: d.documento_bytes,
+        alcance: 'Constancia sobre una copia. No es la escritura pública ni la reemplaza: la escritura digital no está habilitada (Sentencia C-159 de 2021).',
+      }
+    case 'registro_civil':
+      return {
+        ...base, inscrito_nombre: d.inscrito_nombre, inscrito_documento: d.inscrito_documento,
+        fecha_nacimiento: d.fecha_nacimiento, lugar_nacimiento: d.lugar_nacimiento, sexo: d.sexo,
+        progenitor_nombre: nombre, progenitor_documento: p.documento, calidad: d.calidad,
+        otro_progenitor: d.otro_progenitor || 'No se declara',
+      }
+    case 'convivencia': {
+      const hasta = new Date(Date.now() + DOCUMENTOS.convivencia.validezDias * 86400000).toISOString().slice(0, 10)
+      return {
+        ...base, declarante_nombre: nombre, declarante_documento: p.documento,
+        companero_nombre: d.companero_nombre, companero_documento: d.companero_documento,
+        convivencia_desde: d.convivencia_desde, vigente_hasta: hasta,
+      }
+    }
     case 'permiso_menor':
       return {
         ...base, otorgante_nombre: nombre, otorgante_documento: p.documento, calidad: d.calidad,

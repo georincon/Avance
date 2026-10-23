@@ -88,7 +88,7 @@ fi
 
 echo "▸ Verifier de la aerolínea (verifier-$VERIFIER_INSTANCIA)"
 VERIFIER_NOMBRE="$AEROLINEA_NOMBRE" VERIFIER_PROPOSITO="$PROPOSITO" CONSERVAR_PRESENTACIONES=PT30M VIGENCIA_SOLICITUD=PT5M \
-  WRPRC_VCTS="urn:eudi:pid:1,urn:co:aerolinea:tiquete:1" \
+  WRPRC_VCTS="urn:eudi:pid:1,urn:co:aerolinea:tiquete:1,urn:co:notaria:permiso-salida-menor:1" \
   ../_comun/levantar.sh "$VERIFIER_INSTANCIA" \
   | sed 's/^/  │ /'
 

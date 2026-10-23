@@ -246,6 +246,18 @@ const TRAMITES = {
     nombre: 'Fe de vida', color: '#1a6f8f',
     descripcion: 'Constancia de que estás con vida, para presentarla ante un fondo de pensiones u otra entidad. Vale 30 días.',
   },
+  copia_escritura: {
+    nombre: 'Constancia de copia de escritura', color: '#5a4a2a',
+    descripcion: 'Constancia de que tu copia coincide con la escritura del protocolo. Es una constancia, no la escritura. Queda la huella del archivo.',
+  },
+  registro_civil: {
+    nombre: 'Registro civil de nacimiento', color: '#2f6b4f',
+    descripcion: 'Inscribe el nacimiento de tu hijo o hija. El registro queda en tu wallet y sirve, por ejemplo, para afiliarlo como beneficiario en la EPS.',
+  },
+  convivencia: {
+    nombre: 'Declaración de convivencia', color: '#7a3b4f',
+    descripcion: 'Declaras bajo juramento que convives con tu compañero(a) permanente. La EPS la acepta para afiliarlo(a) como beneficiario(a). Vale 90 días.',
+  },
   permiso_menor: {
     nombre: 'Permiso de salida de menor', color: '#2d447c',
     descripcion: 'Autoriza que un menor a tu cargo viaje fuera del país, con o sin acompañante. Vale hasta la fecha de regreso.',
@@ -319,6 +331,9 @@ const ICONOS = {
   reconocimiento: '<path d="M12 3a4 4 0 0 0-2 7.5V13H6v3h12v-3h-4v-2.5A4 4 0 0 0 12 3z"/><path d="M5 20h14"/>',
   fe_vida: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/><path d="M7 12h3l1.5-3 2 5 1.5-2H17"/>',
   autenticacion: '<path d="M4 20h16"/><path d="M5 16c2-5 3 2 5-2s3-3 4-1"/><path d="M15 9l4-4 2 2-4 4-3 1z"/>',
+  copia_escritura: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/>',
+  registro_civil: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-5 4-7 8-7s7 2 8 7"/>',
+  convivencia: '<path d="M12 21s-7-4.600-9-9.200C1.800 8.200 3.900 5 7 5c2 0 3.400 1.100 5 3 1.600-1.900 3-3 5-3 3.100 0 5.200 3.200 4 6.800C19 16.400 12 21 12 21z"/>',
   permiso_menor: '<path d="M3 11l18-8-7 18-3-7z"/><path d="M11 14l10-11"/>',
   verificar: '<path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
 }
@@ -418,7 +433,7 @@ function vistaTramite(tipo) {
   const casilla = (texto) => { const c = el('input', { type: 'checkbox', required: true }); campos.confirmo = c; return el('label', { style: 'flex-direction:row;align-items:flex-start;gap:10px;font-weight:600' }, c, texto) }
   const seleccion = (nombre, opciones) => el('select', { required: true }, el('option', { value: '' }, 'Elige…'), ...opciones.map((o) => el('option', { value: o }, o)))
   const hoy = new Date().toISOString().slice(0, 10)
-  const conArchivo = tipo === 'reconocimiento' || tipo === 'autenticacion'
+  const conArchivo = tipo === 'reconocimiento' || tipo === 'autenticacion' || tipo === 'copia_escritura'
   if (tipo === 'declaracion') {
     cuerpo = [
       campo('Con destino a', 'La entidad o persona ante quien la presentarás.', campos.finalidad = el('input', { required: true, maxlength: 120, placeholder: 'Caja de compensación, EPS, empleador…' })),
@@ -437,6 +452,26 @@ function vistaTramite(tipo) {
       campo('Con destino a (opcional)', 'Por ejemplo, tu fondo de pensiones. Si lo dejas vacío, sirve para quien lo requiera.', campos.entidad_destino = el('input', { maxlength: 120, placeholder: 'Colpensiones, fondo de pensiones, aseguradora…' })),
       el('div', { class: 'aviso info' }, 'El notario deja constancia del medio con el que te identificaste: tu documento de identidad digital, presentado con tu wallet. La constancia vale 30 días.'),
       casilla('Compadezco personalmente y declaro que estoy con vida.'),
+    ]
+  } else if (tipo === 'registro_civil') {
+    cuerpo = [
+      campo('Declaras como', null, campos.calidad = seleccion('calidad', ['Padre', 'Madre'])),
+      campo('Nombre completo del hijo o hija', null, campos.inscrito_nombre = el('input', { required: true, maxlength: 120 })),
+      el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:12px' },
+        campo('Fecha de nacimiento', null, campos.fecha_nacimiento = el('input', { type: 'date', required: true, max: hoy })),
+        campo('Sexo', null, campos.sexo = seleccion('sexo', ['Femenino', 'Masculino']))),
+      campo('Lugar de nacimiento', 'Municipio y departamento.', campos.lugar_nacimiento = el('input', { required: true, maxlength: 100, placeholder: 'Bucaramanga, Santander' })),
+      campo('Otro progenitor (opcional)', 'Nombre completo, si lo declaras.', campos.otro_progenitor = el('input', { maxlength: 120 })),
+      el('div', { class: 'aviso info' }, 'El serial del registro lo asigna el sistema al inscribirlo. Es una simulación: no reemplaza el registro civil de la Registraduría.'),
+      casilla('Declaro bajo la gravedad del juramento que estos datos son ciertos.'),
+    ]
+  } else if (tipo === 'convivencia') {
+    cuerpo = [
+      campo('Nombre completo de tu compañero(a)', null, campos.companero_nombre = el('input', { required: true, maxlength: 120 })),
+      campo('Documento del compañero(a)', 'Solo números.', campos.companero_documento = el('input', { required: true, inputmode: 'numeric', pattern: '\\d{5,12}' })),
+      campo('Conviven desde', null, campos.convivencia_desde = el('input', { type: 'date', required: true, max: hoy })),
+      el('div', { class: 'aviso info' }, 'Sirve, por ejemplo, para afiliar a tu compañero(a) como beneficiario(a) en tu EPS. La constancia vale 90 días.'),
+      casilla('Declaro bajo la gravedad del juramento que convivo con esta persona y que los datos son ciertos.'),
     ]
   } else if (tipo === 'permiso_menor') {
     cuerpo = [
@@ -463,10 +498,16 @@ function vistaTramite(tipo) {
       campos.documento = { documento_nombre: f.name, documento_sha256: huella, documento_bytes: f.size }
       info.textContent = `Huella SHA-256: ${huella}`
     }
-    cuerpo = [el('label', {}, tipo === 'autenticacion' ? 'Documento que firmas' : 'Documento que reconoces', info, archivo)]
+    cuerpo = []
+    if (tipo === 'copia_escritura') cuerpo.push(
+      campo('Escritura pública n.º', 'Solo números.', campos.escritura_numero = el('input', { required: true, inputmode: 'numeric', pattern: '\\d{1,6}' })),
+      campo('Fecha de la escritura', null, campos.escritura_fecha = el('input', { type: 'date', required: true, max: hoy })),
+      campo('Notaría de origen', 'Donde se otorgó la escritura.', campos.notaria_origen = el('input', { required: true, maxlength: 120, placeholder: 'Notaría Tercera de Bucaramanga' })))
+    cuerpo.push(el('label', {}, tipo === 'autenticacion' ? 'Documento que firmas' : tipo === 'copia_escritura' ? 'Copia de la escritura' : 'Documento que reconoces', info, archivo))
+    if (tipo === 'copia_escritura') cuerpo.push(el('div', { class: 'aviso info' }, 'Es una constancia sobre tu copia, no la escritura pública: la escritura digital no está habilitada (Sentencia C-159 de 2021).'), casilla('Entiendo que esto es una constancia y no reemplaza la escritura.'))
     if (tipo === 'autenticacion') cuerpo.push(el('div', { class: 'aviso info' }, 'Es una autenticación, no un reconocimiento: el notario da fe de que la firma es tuya, pero el documento no gana mayor fuerza (Decreto-Ley 960 de 1970, art. 77).'), casilla('Pongo mi firma en este documento en este acto.'))
   }
-  const ROL = { declaracion: 'Declarante', poder: 'Poderdante', reconocimiento: 'Firmante', autenticacion: 'Firmante', fe_vida: 'Titular', permiso_menor: 'Otorgante' }
+  const ROL = { declaracion: 'Declarante', poder: 'Poderdante', reconocimiento: 'Firmante', autenticacion: 'Firmante', fe_vida: 'Titular', copia_escritura: 'Solicitante', registro_civil: 'Declarante', convivencia: 'Declarante', permiso_menor: 'Otorgante' }
   const enviar = el('button', { class: 'primario', type: 'submit' }, 'Firmar y otorgar')
   const form = el('form', {
     onsubmit: async (e) => {
@@ -510,16 +551,33 @@ async function vistaMisTramites() {
   const filas = lista.map((tr) => {
     const t = TRAMITES[tr.tipo]
     const acciones = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' })
+    const enWallet = (tr.entregas ?? 0) > 0
+    const pedir = async (reexpedir) => {
+      if (reexpedir && !confirm('¿Reexpedir este documento? La copia que tienes en tu wallet dejará de valer y recibirás una nueva.')) return
+      try {
+        const r = await api(`/api/tramites/${tr.numero}/oferta`, { method: 'POST', body: reexpedir ? { reexpedir: true } : {} })
+        vistaEntrega(tr, r.oferta)
+      } catch (e) { alert(e.message) }
+    }
     if (tr.estado === 'vigente') {
       acciones.append(
-        el('button', { class: 'secundario', onclick: async () => vistaEntrega(tr, (await api(`/api/tramites/${tr.numero}/oferta`, { method: 'POST' })).oferta) }, 'Recibir en mi wallet'),
+        enWallet
+          ? el('button', { class: 'secundario', title: 'Si perdiste el documento: la copia anterior se revoca', onclick: () => pedir(true) }, 'Reexpedir (lo perdí)')
+          : el('button', { class: 'secundario', onclick: () => pedir(false) }, 'Recibir en mi wallet'),
         el('button', { class: 'peligro', onclick: (e) => confirmarAnulacion(tr, e.target) }, tr.tipo === 'poder' ? 'Revocar' : 'Anular'))
     }
-    const detalle = tr.tipo === 'poder' ? `Apoderado: ${tr.datos.apoderado_nombre}` : tr.tipo === 'declaracion' ? `Con destino a: ${tr.datos.finalidad}` : `Documento: ${tr.datos.documento_nombre}`
+    const d = tr.datos
+    const detalle = {
+      poder: `Apoderado: ${d.apoderado_nombre}`, declaracion: `Con destino a: ${d.finalidad}`,
+      reconocimiento: `Documento: ${d.documento_nombre}`, autenticacion: `Documento: ${d.documento_nombre}`,
+      fe_vida: `Con destino a: ${d.entidad_destino ?? 'quien lo requiera'}`,
+      copia_escritura: `Escritura n.º ${d.escritura_numero} · ${d.notaria_origen}`, convivencia: `Compañero(a): ${d.companero_nombre}`, registro_civil: `Hijo(a): ${d.inscrito_nombre} · nacido(a) el ${d.fecha_nacimiento}`,
+      permiso_menor: `Menor: ${d.menor_nombre} · destino ${d.destino} · del ${d.fecha_salida} al ${d.fecha_regreso}`,
+    }[tr.tipo] ?? ''
     return el('div', { class: 'fila' },
       el('div', { class: 'que' }, el('strong', {}, `${t.nombre} n.º ${tr.numero}`), el('span', {}, `${fecha(tr.fecha)} · ${detalle}`),
         tr.anulado ? el('span', { style: 'display:block' }, `Anulado el ${fecha(tr.anulado.fecha)}: ${tr.anulado.motivo}`) : ''),
-      el('span', { class: `etiqueta ${tr.estado}` }, tr.estado === 'vigente' ? 'Vigente' : 'Anulado'), acciones)
+      el('span', { class: `etiqueta ${tr.estado}` }, tr.estado !== 'vigente' ? 'Anulado' : enWallet ? 'En tu wallet' : 'Emitido, falta recibirlo'), acciones)
   })
   vista.replaceChildren(volver(), el('h1', {}, 'Mis trámites'),
     filas.length ? el('div', { class: 'lista' }, filas) : el('p', { class: 'lead' }, 'Todavía no has hecho trámites en esta notaría.'))

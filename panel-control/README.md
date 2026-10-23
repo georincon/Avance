@@ -131,3 +131,38 @@ no el de la imagen. No es un detalle menor: Compose guarda en cada contenedor la
 `com.docker.compose.version` y, si no coincide con la del cliente que lo maneja, **lo recrea**.
 Con dos versiones distintas (la del host y la de la imagen) el panel y la terminal se recrean los
 contenedores mutuamente, en bucle, y cada acción del panel reinicia el ecosistema entero.
+
+## Vista «Recursos» (`/recursos`)
+
+Tabla en vivo de todo lo que Docker tiene del ecosistema, parecida a `docker ps` pero con más contexto. Se abre
+con el botón **Recursos** del panel (cabecera y menú lateral) y se vuelve con la flecha **Panel de control**.
+
+- **Contenedores:** estado y salud, servicio (tarjeta del panel y grupo), nombre del contenedor, host en la red
+  `avance-eudi` (clic para copiar), puertos publicados e internos, tiempo de actividad, stack e imagen. Clic en una
+  fila para ver redes, IP y volúmenes. Los contenedores que no tienen tarjeta en el panel se marcan «Sin tarjeta».
+- **Redes** y **Volúmenes**, con los contenedores que las usan.
+- **En vivo:** el servidor escucha `docker events` y manda una foto nueva (`/api/recursos/stream`, text/event-stream)
+  a cada navegador abierto con cada cambio de estado; el tiempo de actividad avanza cada segundo. Si el canal se
+  corta, la vista se reconecta sola.
+- Usa el mismo token que el panel. `GET /api/recursos` devuelve la misma foto en JSON.
+
+### Puertos de las bases de datos (desde tu equipo)
+
+Cada base publica un puerto distinto, solo en `127.0.0.1`. Se pueden cambiar con la variable indicada (en el `.env` del stack).
+
+| Base | Motor | Puerto local | Variable |
+|---|---|---|---|
+| `postgres-uis-academic` (`uis_academic`) | PostgreSQL | 5433 | `UIS_ACADEMIC_DB_PORT` |
+| `postgres-uis-issuer` (`uis_issuer`) | PostgreSQL | 5434 | `UIS_ISSUER_DB_PORT` |
+| `postgres-spartans` (`spartans`) | PostgreSQL | 5435 | `SPARTANS_DB_PORT` |
+| `onboarding-postgres` (`onboarding`) | PostgreSQL | 5436 | `ONBOARDING_DB_PORT` |
+| `postgres-reg` (`pid_issuer`) | PostgreSQL | 5441 | `REG_DB_PORT` |
+| `tlp-db` (`trusted_lists`) | MySQL | 3307 | `TLP_DB_PORT` |
+
+La vista «Recursos» filtra por tipo (Issuer, Verifier, Portal, Base de datos, Wallet…) y la búsqueda también encuentra
+por motor, nombre de base, usuario y puerto. En el detalle de una base aparece la cadena JDBC para copiarla.
+
+La última columna de «Recursos» (**Enlaces**) lleva a la página de cada servicio: portales, interfaz y salud de cada verifier,
+consolas de Keycloak, metadatos de los emisores, JWKS del Wallet Provider, etc. Las bases de datos tienen «Copiar JDBC».
+Lo que no tiene página propia enlaza a su proyecto. Las rutas están en `ENLACES_FIJOS` de `server.js`; al añadir un servicio
+con página nueva, se agrega allí (solo páginas que respondan).

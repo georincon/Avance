@@ -8,3 +8,7 @@ V	290124211111Z		1006	unknown	/CN=Admisiones y Becas Avance/O=Admisiones y Becas
 V	290124211716Z		1007	unknown	/CN=Instituto Meridiano/O=Instituto Meridiano/C=CO
 V	290124212352Z		1008	unknown	/CN=Edificio Cumbre/O=Edificio Cumbre/C=CO
 V	290124213642Z		1009	unknown	/CN=Páramo Air/O=Páramo Air/C=CO
+V	290125153227Z		100A	unknown	/CN=Servicio de firma electrónica (simulador)/O=Servicio de firma electrónica (simulador)/C=CO
+V	290125203339Z		100B	unknown	/CN=Fondo de Pensiones Horizonte/O=Fondo de Pensiones Horizonte/C=CO
+V	290125211205Z		100C	unknown	/CN=Ministerio de Relaciones Exteriores de Cívica/O=Ministerio de Relaciones Exteriores de Cívica/C=CO
+V	290125211638Z		100D	unknown	/CN=Universidad Industrial de Santander/O=Universidad Industrial de Santander/C=CO

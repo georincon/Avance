@@ -76,9 +76,46 @@ setInterval(() => {
 // Qué se le pide a la wallet en cada caso.
 const PID = { vct: 'urn:eudi:pid:1', datos: ['personal_administrative_number', 'given_name', 'family_name', 'birthdate'] }
 const CARNE = { vct: DOCUMENTOS.carne.vct, datos: ['eps', 'afiliado_nombre', 'afiliado_documento', 'regimen', 'plan', 'ips_primaria', 'estado'] }
+const NOTARIA_URL = new URL('/notaria', URL_PUBLICA).href
+const CONVIVENCIA = { vct: 'urn:co:notaria:convivencia:1', datos: ['numero', 'declarante_nombre', 'declarante_documento', 'companero_nombre', 'companero_documento', 'convivencia_desde', 'vigente_hasta'] }
+const REGISTRO_CIVIL = { vct: 'urn:co:notaria:registro-civil:1', datos: ['numero', 'inscrito_nombre', 'inscrito_documento', 'fecha_nacimiento', 'progenitor_documento', 'calidad'] }
 const PARTES_HISTORIA = ['grupo_sanguineo', 'alergias', 'condiciones_cronicas', 'medicamentos', 'vacunas', 'ultima_consulta', 'observaciones']
 
+// El afiliado presenta su declaración de convivencia (notaría de confianza) para afiliar a su compañero(a).
+function afiliarBeneficiario(solicitud, r) {
+  const rechazo = (motivo) => ({ estado: 'rechazada', motivo })
+  const d = r.datos
+  const persona = sesiones.get(solicitud.sesion)?.persona
+  if (!persona) return rechazo('Primero identifícate con tu wallet.')
+  const hijo = r.vct === REGISTRO_CIVIL.vct
+  if (!hijo && r.vct !== CONVIVENCIA.vct) return rechazo('La wallet no presentó una declaración de convivencia ni un registro civil.')
+  if (r.emisor !== NOTARIA_URL) return rechazo('El documento no lo emitió una notaría de confianza de este ecosistema.')
+  const hoy = new Date().toISOString().slice(0, 10)
+  if (hijo) {
+    if (String(d.progenitor_documento) !== persona.documento) return rechazo('El registro civil no te señala como padre o madre: el declarante no coincide con quien se identificó.')
+    // Hijos hasta los 18 años (simplificación del simulador; la norma real admite más edad en ciertos casos, sin verificar).
+    const mayor = new Date(`${d.fecha_nacimiento}T00:00:00Z`)
+    mayor.setUTCFullYear(mayor.getUTCFullYear() + 18)
+    if (mayor.toISOString().slice(0, 10) <= hoy) return rechazo('El hijo o hija ya es mayor de edad: en este ejemplo solo se afilian menores de 18 años.')
+  } else {
+    if (String(d.declarante_documento) !== persona.documento) return rechazo('La declaración no es tuya: el declarante no coincide con quien se identificó.')
+    if (!d.vigente_hasta || d.vigente_hasta < hoy) return rechazo('La declaración está vencida. Pide una nueva en la notaría.')
+  }
+  const a = afiliados.buscar(persona.documento)
+  if (!a) return rechazo('No estás afiliado.')
+  if (a.afiliacion.estado !== 'Activo') return rechazo('Tu afiliación no está activa.')
+  if (a.afiliacion.tipo === 'Beneficiario') return rechazo('Eres beneficiario: solo el cotizante puede afiliar beneficiarios.')
+  const b = hijo
+    ? { documento: String(d.inscrito_documento), nombre: d.inscrito_nombre, parentesco: 'Hijo(a)', respaldo: `Registro civil ${d.numero}` }
+    : { documento: String(d.companero_documento), nombre: d.companero_nombre, parentesco: 'Compañero(a) permanente', respaldo: `Declaración de convivencia ${d.numero}` }
+  const res = afiliados.agregarBeneficiario(a.documento, b)
+  if (res?.ya) return rechazo('Esa persona ya es tu beneficiaria.')
+  console.log(`[beneficiario] afiliado con ${hijo ? 'registro civil' : 'declaración de convivencia'}`)
+  return { estado: 'listo', beneficiario: { nombre: b.nombre, documento: b.documento } }
+}
+
 function completar(solicitud, r) {
+  if (['convivencia', 'registro-civil'].includes(solicitud.proposito)) return afiliarBeneficiario(solicitud, r)
   if (!['identificacion', 'medico', 'registro-medico'].includes(solicitud.proposito)) {
     const tipo = porVct(r.vct)
     const def = DOCUMENTOS[tipo]
@@ -166,12 +203,19 @@ r.post('/api/solicitud', async (req, res) => {
     pedido = PID
   }
   else if (proposito === 'carne') pedido = CARNE
+  else if (proposito === 'convivencia') {
+    if (!s.persona) return res.status(401).json({ error: 'Primero identifícate con tu wallet.' })
+    pedido = CONVIVENCIA
+  } else if (proposito === 'registro-civil') {
+    if (!s.persona) return res.status(401).json({ error: 'Primero identifícate con tu wallet.' })
+    pedido = REGISTRO_CIVIL
+  }
   else if (proposito === 'historia') {
     // El médico que recibe elige qué partes pedir; el paciente, en su wallet, cuáles dar.
     const elegidas = (Array.isArray(partes) ? partes : []).filter((p) => PARTES_HISTORIA.includes(p))
     if (!elegidas.length) return res.status(400).json({ error: 'Elige al menos una parte de la historia.' })
     pedido = { vct: DOCUMENTOS.historia.vct, datos: ['paciente_nombre', 'paciente_documento', ...elegidas] }
-  } else return res.status(400).json({ error: 'proposito: identificacion, medico, carne o historia' })
+  } else return res.status(400).json({ error: 'proposito: identificacion, medico, carne, historia o convivencia' })
   try {
     const { transaccion, enlace } = await verifier.crearSolicitud({
       ...pedido, nonce: randomBytes(16).toString('base64url'),
@@ -207,6 +251,7 @@ r.get('/volver', async (req, res) => {
       return solicitud.proposito === 'medico' ? res.redirect(`${BASE}/medico#error=${motivo}`) : ir(`error=${motivo}`)
     }
     if (solicitud.proposito === 'medico') return res.redirect(`${BASE}/medico#entrado`)
+    if (['convivencia', 'registro-civil'].includes(solicitud.proposito)) return ir('mi-eps')
     return ir(solicitud.proposito === 'identificacion' ? 'identificado' : `verificado=${s.pendiente}`)
   } catch {
     return ir(`error=${encodeURIComponent('El servicio de verificación no está disponible.')}`)

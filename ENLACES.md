@@ -272,12 +272,16 @@ para que el validador las tome como anclas; ver `verifiers/docs/CATALOGO-VERIFIE
 | 200 | `/banco/` | Banco Cívica: Ingreso y apertura de cuenta presentando el PID |
 | 200 | `/contratacion/` | Contratación: Nivel de formación académica por nivel; identidad aparte y opcional |
 | 200 | `/eps/` | EPS Salud Avance: Emite carné e historia clínica (QEAA); portal de afiliados, médico y administración |
-| 200 | `/notaria/` | Notaría Avance / Instituto: Emite 6 documentos notariales (PuB-EAA) y verifica el PID; estilo SIGNO! |
+| 200 | `/notaria/` | Notaría Avance / Instituto: Emite 9 documentos notariales (PuB-EAA) y verifica el PID; estilo SIGNO! |
 | 200 | `/aerolinea/` | Páramo Air: venta de pasajes; verifica nombre, documento, fecha de nacimiento y foto del PID, emite el tiquete (QEAA) y lo verifica en el embarque |
 | 200 | `/acceso/` | Edificio Cumbre: Control de acceso: foto, nombre y documento del PID para que un guardia decida el ingreso; estilo de centro de control |
+| 200 | `/pensiones/` | Fondo de Pensiones Horizonte: prueba de supervivencia; acepta la fe de vida notarial y la cruza con el PID |
+| 200 | `/cancilleria/` | Cancillería (ficticia): solicitud, entrega única, reexpedición y verificación del pasaporte digital (PuB-EAA) |
 | 200 | `/beca/` | Instituto Meridiano: Inscripción y becas: PID + credencial académica en una sola presentación |
 | 200 | `/verifier-eps/` | Verifier de la EPS: Interfaz oficial del verifier de esa instancia |
 | 200 | `/verifier-notaria/` | Verifier de la notaría: Idem |
 | 200 | `/verifier-aerolinea/` | Verifier de la aerolínea: Idem |
 | 200 | `/verifier-acceso/` | Verifier de control de acceso: Idem |
 | 200 | `/verifier-beca/` | Verifier de inscripción y becas: Idem |
+| 200 | `/verifier-pensiones/` | Verifier del fondo de pensiones: Idem |
+| 200 | `/verifier-cancilleria/` | Verifier de la Cancillería: Idem |

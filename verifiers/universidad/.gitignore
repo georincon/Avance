@@ -1,0 +1,8 @@
+.env
+node_modules/
+# La CA y la clave de firma de la universidad (scripts/generar-claves.sh)
+secretos/
+# El protocolo: tramites.json
+datos/
+# Lo que deja pruebas/probar-universidad.sh
+pruebas/.salida/

@@ -30,6 +30,7 @@ export function crearTramites(archivo) {
         datos,
         // El índice en la status list es el consecutivo: nunca se reutiliza.
         indice_estado: n,
+        revocados: [],   // índices de la status list de copias anteriores (reexpedición): quedan revocados para siempre
         estado: 'vigente',
         entregas: 0,
       }
@@ -61,6 +62,20 @@ export function crearTramites(archivo) {
       }
     },
 
-    anulados: () => leer().tramites.filter((t) => t.estado === 'anulado').map((t) => t.indice_estado),
+    /** Índices de la status list que valen 1: documentos anulados y copias reexpedidas. */
+    anulados: () => leer().tramites.flatMap((t) => [...(t.estado === 'anulado' ? [t.indice_estado] : []), ...(t.revocados ?? [])]),
+
+    /** Reexpedición (la persona perdió su documento): la copia anterior queda revocada y la siguiente usa otro índice. */
+    reexpedir(numero) {
+      const p = leer()
+      const t = p.tramites.find((x) => x.numero === numero)
+      if (!t || t.estado !== 'vigente') return null
+      t.revocados = [...(t.revocados ?? []), t.indice_estado]
+      t.indice_estado = p.siguiente++
+      t.entregas = 0
+      t.reexpediciones = (t.reexpediciones ?? 0) + 1
+      guardar(p)
+      return t
+    },
   }
 }

@@ -26,7 +26,7 @@
     "tipo": "urn:eudi:pid:1"
    }
   ],
-  "leido": "2026-10-22T21:36:56+00:00"
+  "leido": "2026-10-23T21:16:39+00:00"
  },
  "https://civica-desarrollo.avance.org.co/uis-issuer": {
   "configuraciones": [
@@ -91,7 +91,7 @@
     "tipo": "urn:eudi:academic:credential:1"
    }
   ],
-  "leido": "2026-10-22T15:12:02+00:00"
+  "leido": "2026-10-23T21:16:40+00:00"
  },
  "https://civica-desarrollo.avance.org.co/eps": {
   "configuraciones": [
@@ -108,7 +108,7 @@
     "tipo": "urn:co:eps:resumen-historia-clinica:1"
    }
   ],
-  "leido": "2026-10-22T21:36:56+00:00"
+  "leido": "2026-10-23T21:16:40+00:00"
  },
  "https://civica-desarrollo.avance.org.co/notaria": {
   "configuraciones": [
@@ -143,13 +143,31 @@
     "tipo": "urn:co:notaria:autenticacion-firma:1"
    },
    {
+    "id": "co.notaria.constancia_copia_escritura",
+    "nombre": "co.notaria.constancia_copia_escritura",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:notaria:copia-escritura:1"
+   },
+   {
+    "id": "co.notaria.registro_civil_nacimiento",
+    "nombre": "co.notaria.registro_civil_nacimiento",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:notaria:registro-civil:1"
+   },
+   {
+    "id": "co.notaria.declaracion_convivencia",
+    "nombre": "co.notaria.declaracion_convivencia",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:notaria:convivencia:1"
+   },
+   {
     "id": "co.notaria.permiso_salida_menor",
     "nombre": "co.notaria.permiso_salida_menor",
     "formato": "dc+sd-jwt",
     "tipo": "urn:co:notaria:permiso-salida-menor:1"
    }
   ],
-  "leido": "2026-10-22T21:36:56+00:00"
+  "leido": "2026-10-23T21:16:40+00:00"
  },
  "https://civica-desarrollo.avance.org.co/aerolinea": {
   "configuraciones": [
@@ -160,6 +178,28 @@
     "tipo": "urn:co:aerolinea:tiquete:1"
    }
   ],
-  "leido": "2026-10-22T21:36:56+00:00"
+  "leido": "2026-10-23T21:16:40+00:00"
+ },
+ "https://civica-desarrollo.avance.org.co/cancilleria": {
+  "configuraciones": [
+   {
+    "id": "co.cancilleria.pasaporte",
+    "nombre": "co.cancilleria.pasaporte",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:cancilleria:pasaporte:1"
+   }
+  ],
+  "leido": "2026-10-23T21:16:40+00:00"
+ },
+ "https://civica-desarrollo.avance.org.co/universidad": {
+  "configuraciones": [
+   {
+    "id": "co.universidad.carnet_estudiantil",
+    "nombre": "co.universidad.carnet_estudiantil",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:universidad:carnet-estudiantil:1"
+   }
+  ],
+  "leido": "2026-10-23T21:16:40+00:00"
  }
 }

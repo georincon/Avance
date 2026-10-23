@@ -102,7 +102,7 @@ else
 fi
 
 echo "▸ Verifier de la EPS (verifier-$VERIFIER_INSTANCIA)"
-VERIFIER_NOMBRE="$EPS_NOMBRE" VERIFIER_PROPOSITO="$PROPOSITO" WRPRC_VCTS="urn:eudi:pid:1,urn:co:eps:carne-afiliado:1,urn:co:eps:resumen-historia-clinica:1" CONSERVAR_PRESENTACIONES=PT30M VIGENCIA_SOLICITUD=PT5M ../_comun/levantar.sh "$VERIFIER_INSTANCIA" \
+VERIFIER_NOMBRE="$EPS_NOMBRE" VERIFIER_PROPOSITO="$PROPOSITO" WRPRC_VCTS="urn:eudi:pid:1,urn:co:eps:carne-afiliado:1,urn:co:eps:resumen-historia-clinica:1,urn:co:notaria:convivencia:1,urn:co:notaria:registro-civil:1" CONSERVAR_PRESENTACIONES=PT30M VIGENCIA_SOLICITUD=PT5M ../_comun/levantar.sh "$VERIFIER_INSTANCIA" \
   | sed 's/^/  │ /'
 
 cat <<EOF

@@ -40,8 +40,10 @@ export function crearVerifier({ api }) {
    *   que los cumplen. `datos` son los demás que se piden; un dato anidado va como array (['age_equal_or_over', '18']).
    */
   async function crearSolicitud({ credenciales, nonce }) {
-    const credentials = credenciales.map(({ id, vct, filtros = {}, datos = [] }) => ({
+    const credentials = credenciales.map(({ id, vct, filtros = {}, datos = [], multiple = false }) => ({
       id, format: 'dc+sd-jwt', meta: { vct_values: [vct] },
+      // `multiple`: la wallet deja elegir VARIOS documentos de ese tipo (casillas) en vez de uno solo (círculos).
+      ...(multiple ? { multiple: true } : {}),
       claims: [
         ...Object.entries(filtros).map(([dato, valor]) => ({ path: [].concat(dato), values: [valor] })),
         ...datos.map((dato) => ({ path: [].concat(dato) })),
@@ -74,14 +76,17 @@ export function crearVerifier({ api }) {
     if (cuerpo.error) {
       return { estado: 'error', motivo: cuerpo.error === 'access_denied' ? 'la persona no aceptó compartir los datos' : 'la wallet devolvió un error' }
     }
+    // `credenciales[id]` es el primer documento presentado; `todas[id]` son todos (cuando la consulta es `multiple`).
     const credenciales = {}
+    const todas = {}
     for (const [id, valor] of Object.entries(cuerpo.vp_token ?? {})) {
-      const presentado = [].concat(valor)[0]
-      if (typeof presentado !== 'string') return { estado: 'error', motivo: 'la respuesta no trae todas las credenciales' }
-      credenciales[id] = leerSdJwt(presentado)
+      const presentados = [].concat(valor)
+      if (!presentados.length || presentados.some((x) => typeof x !== 'string')) return { estado: 'error', motivo: 'la respuesta no trae todas las credenciales' }
+      todas[id] = presentados.map(leerSdJwt)
+      credenciales[id] = todas[id][0]
     }
     if (!Object.keys(credenciales).length) return { estado: 'error', motivo: 'la respuesta no trae credenciales' }
-    return { estado: 'listo', credenciales }
+    return { estado: 'listo', credenciales, todas }
   }
 
   return { crearSolicitud, resultado }

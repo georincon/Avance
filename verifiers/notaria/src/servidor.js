@@ -21,7 +21,7 @@
 //   TRAMITES_ARCHIVO     el protocolo (JSON)
 //   PUERTO               80 (el nginx central llama a <prefijo>:80)
 
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomInt } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import express from 'express'
 import { importPKCS8 } from 'jose'
@@ -152,6 +152,36 @@ function validar(tipo, d = {}) {
       if (!Number.isInteger(d.documento_bytes) || d.documento_bytes <= 0) return 'Falta el tamaño del documento.'
       if (d.confirmo !== true) return 'Confirma que la firma la pones tú, en este acto.'
       return { documento_nombre: d.documento_nombre.trim(), documento_sha256: d.documento_sha256, documento_bytes: d.documento_bytes }
+    case 'copia_escritura': {
+      if (!/^\d{1,6}$/.test(d.escritura_numero ?? '')) return 'El número de la escritura debe tener solo dígitos.'
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.escritura_fecha ?? '') || d.escritura_fecha > new Date().toISOString().slice(0, 10)) return 'La fecha de la escritura no puede ser futura.'
+      if (!texto(d.notaria_origen, 3, 120)) return 'Indica la notaría donde se otorgó la escritura.'
+      if (!texto(d.documento_nombre, 1, 200)) return 'Falta el nombre de la copia.'
+      if (!/^[0-9a-f]{64}$/.test(d.documento_sha256 ?? '')) return 'Falta la huella SHA-256 de la copia.'
+      if (!Number.isInteger(d.documento_bytes) || d.documento_bytes <= 0) return 'Falta el tamaño de la copia.'
+      if (d.confirmo !== true) return 'Confirma que entiendes que es una constancia y no la escritura.'
+      return { escritura_numero: d.escritura_numero, escritura_fecha: d.escritura_fecha, notaria_origen: d.notaria_origen.trim(), documento_nombre: d.documento_nombre.trim(), documento_sha256: d.documento_sha256, documento_bytes: d.documento_bytes }
+    }
+    case 'registro_civil': {
+      const hoy = new Date().toISOString().slice(0, 10)
+      if (!['Padre', 'Madre'].includes(d.calidad)) return 'Indica si declaras como padre o como madre.'
+      if (!texto(d.inscrito_nombre, 5, 120)) return 'Escribe el nombre completo del hijo o hija.'
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha_nacimiento ?? '') || d.fecha_nacimiento > hoy) return 'La fecha de nacimiento no puede ser futura.'
+      if (!texto(d.lugar_nacimiento, 3, 100)) return 'Indica el lugar de nacimiento.'
+      if (!['Femenino', 'Masculino'].includes(d.sexo)) return 'Indica el sexo.'
+      if (d.otro_progenitor && !texto(d.otro_progenitor, 5, 120)) return 'El nombre del otro progenitor debe tener entre 5 y 120 caracteres.'
+      if (d.confirmo !== true) return 'Debes declarar bajo juramento que los datos son ciertos.'
+      // El serial lo asigna el sistema (en la vida real, la Registraduría): 10 dígitos.
+      const serial = String(randomInt(1000000000, 9999999999))
+      return { inscrito_nombre: d.inscrito_nombre.trim(), inscrito_documento: serial, fecha_nacimiento: d.fecha_nacimiento, lugar_nacimiento: d.lugar_nacimiento.trim(), sexo: d.sexo, calidad: d.calidad, otro_progenitor: d.otro_progenitor?.trim() || null }
+    }
+    case 'convivencia': {
+      if (!texto(d.companero_nombre, 5, 120)) return 'Escribe el nombre completo de tu compañero(a).'
+      if (!/^\d{5,12}$/.test(d.companero_documento ?? '')) return 'El documento del compañero(a) debe tener solo dígitos (5 a 12).'
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.convivencia_desde ?? '') || d.convivencia_desde > new Date().toISOString().slice(0, 10)) return 'La fecha de inicio de la convivencia no puede ser futura.'
+      if (d.confirmo !== true) return 'Debes declarar bajo juramento que los datos son ciertos.'
+      return { companero_nombre: d.companero_nombre.trim(), companero_documento: d.companero_documento, convivencia_desde: d.convivencia_desde }
+    }
     case 'permiso_menor': {
       const hoy = new Date().toISOString().slice(0, 10)
       const fecha = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v ?? '')
@@ -278,10 +308,17 @@ r.post('/api/tramites', conPersona(async (req, res, persona) => {
 r.get('/api/tramites', conPersona((_req, res, persona) => res.json(tramites.dePersona(persona.documento))))
 
 r.post('/api/tramites/:numero/oferta', conPersona(async (req, res, persona) => {
-  const t = tramites.buscar(req.params.numero)
-  if (!t || t.persona.documento !== persona.documento) return res.status(404).json({ error: 'No es un trámite tuyo.' })
-  if (t.estado === 'anulado') return res.status(409).json({ error: 'Este trámite está anulado.' })
-  res.json({ oferta: await oferta(t) })
+  let tr = tramites.buscar(req.params.numero)
+  if (!tr || tr.persona.documento !== persona.documento) return res.status(404).json({ error: 'No es un trámite tuyo.' })
+  if (tr.estado === 'anulado') return res.status(409).json({ error: 'Este trámite está anulado.' })
+  if ((tr.entregas ?? 0) > 0) {
+    // Ya está en una wallet: no se entrega otra copia (acabarías con documentos repetidos). Si se perdió, se reexpide y la anterior queda revocada.
+    if (req.body?.reexpedir !== true) return res.status(409).json({ error: 'Este documento ya está en una wallet. Si la perdiste, pide la reexpedición: la copia anterior dejará de valer.', ya_entregado: true })
+    tr = tramites.reexpedir(tr.numero)
+    estado.invalidar()
+    console.log(`[reexpedición] ${DOCUMENTOS[tr.tipo].nombre} ${tr.numero}: la copia anterior queda revocada`)
+  }
+  res.json({ oferta: await oferta(tr) })
 }))
 
 r.post('/api/tramites/:numero/anular', conPersona((req, res, persona) => {
