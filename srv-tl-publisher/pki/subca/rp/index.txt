@@ -12,3 +12,5 @@ V	290125153227Z		100A	unknown	/CN=Servicio de firma electrónica (simulador)/O=S
 V	290125203339Z		100B	unknown	/CN=Fondo de Pensiones Horizonte/O=Fondo de Pensiones Horizonte/C=CO
 V	290125211205Z		100C	unknown	/CN=Ministerio de Relaciones Exteriores de Cívica/O=Ministerio de Relaciones Exteriores de Cívica/C=CO
 V	290125211638Z		100D	unknown	/CN=Universidad Industrial de Santander/O=Universidad Industrial de Santander/C=CO
+V	290128125116Z		100E	unknown	/CN=Migración Cívica/O=Migración Cívica/C=CO
+V	290128224142Z		100F	unknown	/CN=Cumbre Gym/O=Cumbre Gym/C=CO

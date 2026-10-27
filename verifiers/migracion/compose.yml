@@ -1,0 +1,28 @@
+# Portal de control migratorio (retrato y datos del pasaporte cruzados con el PID). Se une a la red compartida "avance-eudi" con el alias
+# app-migracion (srv-nw-nginx le pasa /migracion/… con la ruta completa) y habla con su verifier
+# (../_comun, instancia VERIFIER_INSTANCIA) por la misma red, usando el alias de su haproxy.
+# Sin volúmenes: no guarda nada.
+#
+#   ./levantar.sh, o ya creado: docker compose -p migracion --env-file .env logs -f
+name: migracion
+
+services:
+  migracion:
+    build: .
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      URL_PUBLICA: https://${DOMINIO}/${PREFIJO}
+      VERIFIER_API: http://verifier-${VERIFIER_INSTANCIA}/verifier-${VERIFIER_INSTANCIA}
+      NOMBRE_ENTIDAD: ${NOMBRE_ENTIDAD}
+      PUERTO: "80"
+    networks:
+      avance-eudi:
+        aliases: ["app-${PREFIJO}"]
+
+networks:
+  avance-eudi:
+    name: avance-eudi
+    external: true

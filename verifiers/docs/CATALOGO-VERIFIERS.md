@@ -14,9 +14,11 @@ Las fuentes son las del corpus del repositorio (`docs/corpus-eudi`): ARF y sus t
 | Notaría (`/notaria`) | PID; emite 9 actos (PuB-EAA) | Poder, declaración, reconocimiento, fe de vida, autenticación de firma, permiso de menor, constancia de copia de escritura, declaración de convivencia, registro civil de nacimiento |
 | Inscripción y becas (`/beca`) | PID + académica (presentación combinada) | Pre-evaluación sin identidad; identidad solo si cumple |
 | Aerolínea (`/aerolinea`) | PID (nombre, documento, fecha de nacimiento, foto); emite el tiquete (QEAA); verifica además el permiso de salida de menor de la notaría | Venta de pasajes (propio o de un menor a cargo) y embarque con tiquete + PID; un menor en vuelo internacional presenta además el permiso en un segundo paso |
+| Gimnasio (`/gym`) | PID para afiliarse; emite la **tarjeta de socio** (QEAA) y la verifica en la entrada y en la salida de cada sede | Membresía por plan, control de **ingreso y egreso** con aforo por sede en vivo, sin repetir entrada sin salir; la entrada solo ve nombre, plan y vigencia; el registro guarda el número de socio, no el documento; las pantallas de la puerta piden clave (ver `gym/README.md`) |
 | Control de acceso (`/acceso`) | PID | Foto, nombre y documento mostrados al guardia, que decide; sin guardar la foto |
 | Fondo de pensiones (`/pensiones`) | Fe de vida (PuB-EAA de la notaría) + PID | Prueba de supervivencia: emisor notarial de confianza, titular = PID, vigencia de 30 días; sin guardar datos |
 | Cancillería (`/cancilleria`) | PID (nombre, documento, nacimiento, retrato); emite el pasaporte (PuB-EAA) | Solicitud, entrega única, reexpedición y reporte de pérdida; el retrato del PID va al pasaporte |
+| Migración (`/migracion`) | PID + pasaporte (Cancillería) | Control de entrada o salida: comprueba emisor, vigencia, mismo documento y mismo nombre, muestra los dos retratos y el funcionario decide; sin guardar retratos |
 | Carnet Estudiantil (`/uis-issuer`) | Lo emite el propio issuer de la UIS desde su página de programas (botón CARNET de cada programa ACTIVO); sin PID | Solo estudiantes ACTIVOS; datos básicos que pide una beca; vale hasta fin de periodo y lleva status list (revocable) |
 
 ## Casos reales de la UE y cómo se simulan

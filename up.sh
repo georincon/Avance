@@ -118,7 +118,7 @@ echo
 echo "Ecosistema disponible en https://civica-desarrollo.avance.org.co"
 echo "El panel de control, en la raiz del dominio."
 if [ "$CON_PORTALES" -eq 1 ]; then
-  echo "Portales: /discoteca /banco /contratacion /eps /notaria /aerolinea /beca /acceso /pensiones /cancilleria"
+  echo "Portales: /discoteca /banco /contratacion /eps /notaria /aerolinea /beca /acceso /pensiones /cancilleria /migracion"
 fi
 if [ "$CON_UIS" -eq 0 ]; then
   echo "El issuer de la UIS queda fuera; para levantarlo:"

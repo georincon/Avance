@@ -35,7 +35,7 @@ mostrar "Issuer UIS (compose propio)" "eudi-srv-issuer-pid-uis/docker-compose/do
 
 # Los portales de ejemplo de verifiers/: la app y los tres contenedores de su verifier.
 printf "\n%sPortales de ejemplo (verifiers/)%s\n" "$BOLD" "$FIN"
-for n in discoteca banco contratacion eps notaria aerolinea beca acceso pensiones cancilleria; do
+for n in discoteca banco contratacion eps notaria aerolinea beca acceso pensiones cancilleria migracion; do
   app="$(docker inspect -f '{{.State.Running}}' "$n-$n-1" 2>/dev/null || echo false)"
   ver="$(docker ps --filter "name=^verifier-$n-" --filter status=running -q | wc -l)"
   if [ "$app" = "true" ] && [ "$ver" -ge 3 ]; then marca="en pie"
@@ -55,7 +55,7 @@ for ruta in "/" \
             "/verifier/actuator/health" \
             "/trust-validator/actuator/health" \
             "/tl-publisher/tl-api/v1/lists" \
-            "/discoteca/" "/banco/" "/contratacion/" "/eps/" "/notaria/" "/aerolinea/" "/beca/" "/acceso/" "/pensiones/" "/cancilleria/"; do
+            "/discoteca/" "/banco/" "/contratacion/" "/eps/" "/notaria/" "/aerolinea/" "/beca/" "/acceso/" "/pensiones/" "/cancilleria/" "/migracion/"; do
   codigo="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "https://civica-desarrollo.avance.org.co$ruta")"
   case "$codigo" in
     200) marca="ok " ;;

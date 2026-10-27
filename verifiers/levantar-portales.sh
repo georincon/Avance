@@ -21,7 +21,7 @@
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-TODOS=(discoteca banco contratacion eps notaria aerolinea beca acceso pensiones cancilleria)
+TODOS=(discoteca banco contratacion eps notaria aerolinea beca acceso pensiones cancilleria migracion)
 BUILD=()
 PORTALES=()
 for a in "$@"; do

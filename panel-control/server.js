@@ -53,10 +53,12 @@ const entries = [
   verifierApp('discoteca', 'Verifier Discoteca', 'Discoteca: comprueba la mayoría de edad sin guardar ningún dato', 'nightlife'),
   verifierApp('notaria', 'Notaría', 'Notaría de ejemplo: verifica el PID y emite 6 documentos notariales (poder, fe de vida, autenticación de firma, permiso de menor…)', 'notary'),
   verifierApp('eps', 'Verifier EPS', 'EPS: carné de afiliado e historia clínica con la wallet; portal médico', 'health'),
+  verifierApp('gym', 'Gimnasio (Cumbre Gym)', 'Gimnasio: emite la tarjeta de socio a la wallet y controla la entrada y la salida de cada sede, con aforo en vivo', 'dumbbell'),
   verifierApp('aerolinea', 'Aerolínea (Páramo Air)', 'Aerolínea de ejemplo: verifica nombre, documento, edad y foto, vende el pasaje y emite el tiquete a la wallet', 'plane'),
   verifierApp('acceso', 'Verifier Control de acceso', 'Portería: foto, nombre y documento del PID para que un guardia decida el ingreso', 'shield-check'),
   verifierApp('pensiones', 'Verifier Fondo de pensiones', 'Prueba de supervivencia: acepta la fe de vida notarial y la cruza con el PID', 'health'),
   verifierApp('cancilleria', 'Verifier Cancillería', 'Pasaportes: identifica con el PID y emite el pasaporte digital (PuB-EAA)', 'globe'),
+  verifierApp('migracion', 'Verifier Migración', 'Control migratorio: pasaporte de la Cancillería + PID; el funcionario compara los retratos y decide entrada o salida', 'shield-check'),
   verifierApp('beca', 'Verifier Inscripción y becas', 'Admisiones y becas: pre-evalúa con PID + credencial académica sin saber quién es la persona', 'school'),
   { id:'trust-validator', name:'Trust Validator', group:'Servicios de confianza', folder:'eudi-srv-trust-validator/docker-compose', compose:'docker-compose.yaml', url:'/trust-validator/actuator/health', icon:'shield', description:'Validador de confianza (LoTE/TSL)', containers:['trust-validator'], services:['trust-validator'] },
   // Simulador del prestador de firma remota (estilo Andes SCD): API CSC v2, certificados de firma de la
@@ -418,8 +420,8 @@ const ENLACES_FIJOS = {
   'nw-nginx': [L('Inicio', '/')],
   'avance-control-panel': [L('Panel', '/'), L('Recursos', '/recursos')],
 };
-const CON_SALUD = new Set(['banco', 'contratacion', 'discoteca', 'notaria', 'eps', 'aerolinea', 'acceso', 'beca', 'pensiones', 'cancilleria']);
-const ENLACES_EXTRA = { eps: [L('Administración', '/eps/admin'), L('Portal médico', '/eps/medico')] };
+const CON_SALUD = new Set(['banco', 'contratacion', 'discoteca', 'notaria', 'eps', 'gym', 'aerolinea', 'acceso', 'beca', 'pensiones', 'cancilleria', 'migracion']);
+const ENLACES_EXTRA = { eps: [L('Administración', '/eps/admin'), L('Portal médico', '/eps/medico')], gym: [L('Control de acceso', '/gym/acceso'), L('Administración', '/gym/admin')] };
 
 function enlacesDe(nombre, servicio, stack, tarjeta) {
   if (ENLACES_FIJOS[nombre]) return ENLACES_FIJOS[nombre];

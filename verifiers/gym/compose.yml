@@ -1,0 +1,34 @@
+# El gimnasio de ejemplo (tarjeta de socio y control de ingreso y egreso). Cuelga de la red compartida
+# "avance-eudi" con el alias app-PREFIJO: el nginx central le pasa con la ruta completa
+# https://DOMINIO/PREFIJO/… y https://DOMINIO/.well-known/<x>/PREFIJO (la metadata del emisor). Habla con su
+# verifier (../_comun, instancia VERIFIER_INSTANCIA) por la misma red.
+#
+# Se usa con ./levantar.sh o, ya creada: docker compose -p gym --env-file .env logs -f
+name: gym
+
+services:
+  gym:
+    build: .
+    restart: unless-stopped
+    user: ${UID_GID:-1000:1000}
+    environment:
+      URL_PUBLICA: https://${DOMINIO}/${PREFIJO}
+      VERIFIER_API: http://verifier-${VERIFIER_INSTANCIA}/verifier-${VERIFIER_INSTANCIA}
+      TRUST_VALIDATOR_URL: ${TRUST_VALIDATOR_URL}
+      GYM_NOMBRE: ${GYM_NOMBRE}
+      ADMIN_CLAVE: ${ADMIN_CLAVE}
+      AFORO_MAXIMO: ${AFORO_MAXIMO:-60}
+      SECRETOS_DIR: /secretos
+      SOCIOS_ARCHIVO: /datos/socios.json
+      PUERTO: "80"
+    volumes:
+      - ./datos:/datos
+      - ./secretos:/secretos:ro
+    networks:
+      avance-eudi:
+        aliases: ["app-${PREFIJO}"]
+
+networks:
+  avance-eudi:
+    name: avance-eudi
+    external: true

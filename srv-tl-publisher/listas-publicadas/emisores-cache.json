@@ -26,7 +26,7 @@
     "tipo": "urn:eudi:pid:1"
    }
   ],
-  "leido": "2026-10-23T21:16:39+00:00"
+  "leido": "2026-10-26T22:41:43+00:00"
  },
  "https://civica-desarrollo.avance.org.co/uis-issuer": {
   "configuraciones": [
@@ -89,9 +89,21 @@
     "nombre": "urn:eudi:academic:credential:1:dc+sd-jwt_deferred",
     "formato": "dc+sd-jwt",
     "tipo": "urn:eudi:academic:credential:1"
+   },
+   {
+    "id": "urn:co:uis:carnet-estudiantil:1:dc+sd-jwt",
+    "nombre": "urn:co:uis:carnet-estudiantil:1:dc+sd-jwt",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:uis:carnet-estudiantil:1"
+   },
+   {
+    "id": "urn:co:uis:carnet-estudiantil:1:dc+sd-jwt_deferred",
+    "nombre": "urn:co:uis:carnet-estudiantil:1:dc+sd-jwt_deferred",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:uis:carnet-estudiantil:1"
    }
   ],
-  "leido": "2026-10-23T21:16:40+00:00"
+  "leido": "2026-10-26T22:41:43+00:00"
  },
  "https://civica-desarrollo.avance.org.co/eps": {
   "configuraciones": [
@@ -108,7 +120,7 @@
     "tipo": "urn:co:eps:resumen-historia-clinica:1"
    }
   ],
-  "leido": "2026-10-23T21:16:40+00:00"
+  "leido": "2026-10-26T22:41:43+00:00"
  },
  "https://civica-desarrollo.avance.org.co/notaria": {
   "configuraciones": [
@@ -167,7 +179,7 @@
     "tipo": "urn:co:notaria:permiso-salida-menor:1"
    }
   ],
-  "leido": "2026-10-23T21:16:40+00:00"
+  "leido": "2026-10-26T22:41:43+00:00"
  },
  "https://civica-desarrollo.avance.org.co/aerolinea": {
   "configuraciones": [
@@ -178,7 +190,7 @@
     "tipo": "urn:co:aerolinea:tiquete:1"
    }
   ],
-  "leido": "2026-10-23T21:16:40+00:00"
+  "leido": "2026-10-26T22:41:43+00:00"
  },
  "https://civica-desarrollo.avance.org.co/cancilleria": {
   "configuraciones": [
@@ -189,7 +201,7 @@
     "tipo": "urn:co:cancilleria:pasaporte:1"
    }
   ],
-  "leido": "2026-10-23T21:16:40+00:00"
+  "leido": "2026-10-26T22:41:43+00:00"
  },
  "https://civica-desarrollo.avance.org.co/universidad": {
   "configuraciones": [
@@ -201,5 +213,16 @@
    }
   ],
   "leido": "2026-10-23T21:16:40+00:00"
+ },
+ "https://civica-desarrollo.avance.org.co/gym": {
+  "configuraciones": [
+   {
+    "id": "co.gym.tarjeta_socio",
+    "nombre": "co.gym.tarjeta_socio",
+    "formato": "dc+sd-jwt",
+    "tipo": "urn:co:gym:tarjeta-socio:1"
+   }
+  ],
+  "leido": "2026-10-26T22:41:43+00:00"
  }
 }
