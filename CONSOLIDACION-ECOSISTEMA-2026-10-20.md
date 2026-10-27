@@ -23,7 +23,7 @@
 >   tampoco funciona contra la LOTL oficial del testbed EUDI. El validador decide la confianza
 >   contra un almacén de anclas que se construye con las mismas que publica el publicador.
 > - Se unificó la estructura: todos los compose en `<proyecto>/docker-compose/`, con `up.sh` y
->   `down.sh` idempotentes por proyecto. `Avance_II/` quedó en `Avance/_legacy/`.
+>   `down.sh` idempotentes por proyecto. `Avance_II/` quedó en `Avance/_legacy/` (desde el 27-oct-2026 está fuera del repo, en `~/Workspace/Avance_legacy/`).
 >
 > El detalle de todo esto está en [`ECOSISTEMA.md`](./ECOSISTEMA.md) y en el informe de la
 > segunda sesión que acompaña a este documento.

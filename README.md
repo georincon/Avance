@@ -80,7 +80,7 @@ qué URL se accede y cómo se levanta. `ENLACES.md` es el mapa de rutas y creden
 
 | Carpeta | Qué es |
 |---|---|
-| `_legacy/` | Instantáneas anteriores a la consolidación. No es parte del runtime. Ver su README. |
+| _(fuera del repo)_ `../Avance_legacy/` | Instantáneas anteriores a la consolidación, movidas fuera de `Avance/` el 27-oct-2026. No es parte del runtime. Ver su README. |
 | `docs/corpus-eudi/` | Corpus normativo ARF/HLR y la implementación de referencia, para consulta |
 
 ## Cosas que conviene saber

@@ -73,7 +73,7 @@ Todos los proyectos siguen la misma convención: el compose vive en
 | `app-new-wallet` | Solo la app Android (los servicios viven en sus propios proyectos) | — | — |
 | `app-avance-wallet` | Solo la app Android | — | — |
 | `panel-control` | Panel web de operación | — | `avance-eudi` |
-| `_legacy/` | Instantáneas anteriores a la consolidación. **No es parte del runtime.** | — | — |
+| _(fuera del repo)_ `../Avance_legacy/` | Instantáneas anteriores a la consolidación, movidas fuera de `Avance/` el 27-oct-2026. **No es parte del runtime.** | — | — |
 | `docs/corpus-eudi/` | Corpus ARF/HLR y herramienta de consulta normativa | — | — |
 
 ## 4. Rutas del proxy único

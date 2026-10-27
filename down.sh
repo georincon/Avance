@@ -35,7 +35,6 @@ docker compose down "$@" || true
 # 2) Cada stack por su propio compose, por si se levantaron de una en una.
 for compose in */docker-compose/docker-compose.yaml; do
   proyecto="${compose%%/*}"
-  [ "$proyecto" = "_legacy" ] && continue
   en_pie="$(docker compose -f "$compose" ps --all -q 2>/dev/null | wc -l)"
   [ "$en_pie" -gt 0 ] || continue
   echo ">> Bajando el stack de $proyecto..."

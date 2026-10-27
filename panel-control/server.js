@@ -1,8 +1,10 @@
 import http from 'node:http';
 import { spawn } from 'node:child_process';
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, readdir, stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import path from 'node:path';
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import QRCode from 'qrcode';
 import { fileURLToPath } from 'node:url';
 
 const root = process.env.AVANCE_ROOT || '/home/geovani/Workspace/Avance';
@@ -530,8 +532,77 @@ function readBody(req) {
   });
 }
 
+// --- Descarga de la wallet (pública: la abre el teléfono, que no tiene el token) ----------------------------
+// El panel monta el repositorio, así que sirve el último APK que se compiló sin copiarlo a ningún lado.
+const apkDir = process.env.WALLET_APK_DIR || path.join(root, 'app-new-wallet', 'app', 'build', 'outputs', 'apk');
+const apkHuellas = new Map();
+
+/** El APK más reciente bajo la carpeta de compilación (el de dev/debug tiene prioridad si hay empate de fecha). */
+async function ultimoApk() {
+  const encontrados = [];
+  async function recorrer(dir) {
+    let entradas;
+    try { entradas = await readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entradas) {
+      const ruta = path.join(dir, e.name);
+      if (e.isDirectory()) await recorrer(ruta);
+      else if (e.name.endsWith('.apk') && !/androidTest/i.test(e.name)) {
+        const s = await stat(ruta);
+        encontrados.push({ ruta, nombre: e.name, tamano: s.size, subido: s.mtime });
+      }
+    }
+  }
+  await recorrer(apkDir);
+  return encontrados.sort((a, b) => b.subido - a.subido)[0] ?? null;
+}
+
+function huellaDe(apk) {
+  const clave = `${apk.ruta}:${apk.tamano}:${apk.subido.getTime()}`;
+  if (!apkHuellas.has(clave)) {
+    apkHuellas.set(clave, new Promise((resolve, reject) => {
+      const h = createHash('sha256');
+      createReadStream(apk.ruta).on('data', (d) => h.update(d)).on('end', () => resolve(h.digest('hex'))).on('error', reject);
+    }));
+  }
+  return apkHuellas.get(clave);
+}
+
+const enlacePublico = (req) => `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}/descargas/wallet.apk`;
+
+async function descargas(req, res, pathname) {
+  const json = (codigo, cuerpo) => { res.writeHead(codigo, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(cuerpo)); };
+  const apk = await ultimoApk();
+  if (!apk) return json(404, { error: 'Todavía no hay un APK compilado.' });
+
+  if (pathname === '/descargas/apk.json') {
+    return json(200, { archivo: apk.nombre, tamano: apk.tamano, subido: apk.subido.toISOString(), sha256: await huellaDe(apk), url: enlacePublico(req) });
+  }
+  if (pathname === '/descargas/qr.svg') {
+    const svg = await QRCode.toString(enlacePublico(req), { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+    res.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'no-store' });
+    return res.end(svg);
+  }
+  if (pathname === '/descargas/wallet.apk') {
+    const cabeceras = { 'content-type': 'application/vnd.android.package-archive', 'content-disposition': 'attachment; filename="avance-wallet.apk"', 'accept-ranges': 'bytes', 'cache-control': 'no-store' };
+    const rango = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
+    let desde = 0, hasta = apk.tamano - 1;
+    if (rango && (rango[1] || rango[2])) {
+      if (rango[1]) { desde = Number(rango[1]); if (rango[2]) hasta = Math.min(Number(rango[2]), hasta); }
+      else desde = Math.max(apk.tamano - Number(rango[2]), 0);
+      if (desde > hasta) { res.writeHead(416, { 'content-range': `bytes */${apk.tamano}` }); return res.end(); }
+      res.writeHead(206, { ...cabeceras, 'content-range': `bytes ${desde}-${hasta}/${apk.tamano}`, 'content-length': hasta - desde + 1 });
+    } else {
+      res.writeHead(200, { ...cabeceras, 'content-length': apk.tamano });
+    }
+    if (req.method === 'HEAD') return res.end();
+    return createReadStream(apk.ruta, { start: desde, end: hasta }).on('error', () => res.destroy()).pipe(res);
+  }
+  return json(404, { error: 'Ruta no encontrada.' });
+}
+
 const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url, 'http://localhost').pathname;
+  if (pathname.startsWith('/descargas/')) return descargas(req, res, pathname).catch(() => { if (!res.headersSent) res.writeHead(500); res.end(); });
   if (pathname.startsWith('/api/')) {
     if (!authorized(req)) return send(res, 401, {error:'Token de acceso incorrecto o ausente.'});
     if (pathname === '/api/projects' && req.method === 'GET') return send(res, 200, await Promise.all(projects.map(status)));
