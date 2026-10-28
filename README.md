@@ -27,7 +27,6 @@ que cada uno conserva su fichero, sus variables y sus secretos:
 | `srv-onboarding` | Onboarding: documento, OCR, selfie, OTP, consentimiento | `/onboarding` |
 | `srv-tl-publisher` | Publicador de listas de confianza + su back-office | `/tl-publisher` |
 | `eudi-srv-trust-validator` | Validador de confianza | `/trust-validator` |
-| `eudi-srv-verifier-local-build` | Verificador (Relying Party) | `/verifier` |
 | `srv-nw-nginx` | Proxy único: 80 y 443, y todo lo demás detrás | — |
 | `panel-control` | Panel de operación | `/` |
 | `app-new-wallet` | Ancla de la app Android (su servicio vive en la red compartida) | — |
@@ -66,7 +65,6 @@ documentación.
 | `eudi-srv-issuer-pid-uis` | Attestation Provider (PuB-EAA) |
 | `eudi-srv-wallet-provider` | Wallet Provider |
 | `eudi-srv-trust-validator` | Validador de confianza (LoTE/TSL) |
-| `eudi-srv-verifier-local-build` | Relying Party / Verificador |
 | `srv-tl-publisher` | Trusted List Provider (y su back-office) |
 | `srv-onboarding` | Identity proofing |
 | `srv-nw-nginx` | Gateway |
@@ -80,6 +78,7 @@ qué URL se accede y cómo se levanta. `ENLACES.md` es el mapa de rutas y creden
 
 | Carpeta | Qué es |
 |---|---|
+| _(fuera del repo)_ `../eudi-srv-verifier-local-build/` | Verificador genérico (`/verifier`). Retirado el 28-oct-2026. Fuera del ecosistema. |
 | _(fuera del repo)_ `../Avance_legacy/` | Instantáneas anteriores a la consolidación, movidas fuera de `Avance/` el 27-oct-2026. No es parte del runtime. Ver su README. |
 | `docs/corpus-eudi/` | Corpus normativo ARF/HLR y la implementación de referencia, para consulta |
 

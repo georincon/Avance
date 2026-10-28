@@ -55,7 +55,6 @@ include:
   # ── Servicios de confianza ──
   - path: srv-tl-publisher/docker-compose/docker-compose.yaml
   - path: eudi-srv-trust-validator/docker-compose/docker-compose.yaml
-  - path: eudi-srv-verifier-local-build/docker-compose/docker-compose.yaml
   # ── Gateway y operación ──
   - path: srv-nw-nginx/docker-compose/docker-compose.yaml
   - path: panel-control/docker-compose/docker-compose.yaml

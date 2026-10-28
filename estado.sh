@@ -52,7 +52,6 @@ for ruta in "/" \
             "/wallet-provider/.well-known/oauth-protected-resource" \
             "/pid-registraduria/.well-known/openid-credential-issuer" \
             "/uis-issuer/.well-known/openid-credential-issuer" \
-            "/verifier/actuator/health" \
             "/trust-validator/actuator/health" \
             "/tl-publisher/tl-api/v1/lists" \
             "/discoteca/" "/banco/" "/contratacion/" "/eps/" "/notaria/" "/aerolinea/" "/beca/" "/acceso/" "/pensiones/" "/cancilleria/" "/migracion/"; do

@@ -24,7 +24,6 @@ nw-nginx  (este proyecto, 192.168.0.240:443)
         ├── /idp-reg/*             → haproxy-reg:80
         ├── /uis-issuer/*         → haproxy-uis:80
         ├── /idp-uis/*            → haproxy-uis:80
-        ├── /verifier/*           → avance-verifier-api:8080
         ├── /trust-validator/*    → trust-validator:8080
         ├── /tl-publisher/*, /TL/*, /LOTL/*  → tl-publisher:8080
         ├── /pki/*                → tl-publisher-pki:8080

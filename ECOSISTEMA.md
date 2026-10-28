@@ -13,7 +13,6 @@ Fecha: 2026-10-20 · Dominio: `civica-desarrollo.avance.org.co` · Proxy públic
 | Wallet Provider | `eudi-srv-wallet-provider` | `spartans-wallet-provider` | `/wallet-provider` | `Spartans Wallet Provider Root CA` (TL/WP) | ✅ operativo |
 | PID Provider | `eudi-srv-issuer-pid-registraduria` | `pid-issuer-reg` | `/pid-registraduria` | `REGISTRADURIA ISSUANCE ROOT` (TL/PID) | ✅ operativo |
 | Attestation Provider (UIS) | `eudi-srv-issuer-pid-uis` | `uis-issuer` | `/uis-issuer` | `UIS Issuer Root CA` (TL/PUBEAA) | ✅ operativo |
-| Relying Party / Verifier | `eudi-srv-verifier-local-build` | `avance-verifier-api` | `/verifier` | `Avance Verifier Access CA` (TL/RPREG) | ✅ operativo |
 | Wallet Unit | `app-new-wallet` | app Android `co.org.newwallet.app.dev` | — | — | ⚠️ compilar con el dominio |
 | Wallet Unit | `app-avance-wallet` | app Android `co.org.avance.wallet.dev` | — | — | ⚠️ compilar con el dominio |
 | Onboarding (identity proofing) | `srv-onboarding` | `onboarding-backend` | `/onboarding` | — | ✅ operativo |
@@ -43,7 +42,6 @@ Un solo punto de entrada y una sola red Docker compartida.
  provider:8080        backend:8095      (issuer + kc)        (publica las TL)
                           │
                           ├──────────────► haproxy-uis        (issuer UIS + kc en /idp-uis)
-                          ├──────────────► avance-verifier-api:8080
                           ├──────────────► trust-validator:8080
                           └──────────────► tl-publisher-pki:8080  (AIA / CRLDP)
 ```
@@ -67,12 +65,12 @@ Todos los proyectos siguen la misma convención: el compose vive en
 | `eudi-srv-wallet-provider` | Postgres + status-list + provider | — | `avance-eudi` |
 | `eudi-srv-issuer-pid-registraduria` | Postgres + Keycloak + status-list + issuer + haproxy | — | `avance-eudi` |
 | `eudi-srv-issuer-pid-uis` | 2 Postgres + Keycloak (`/idp-uis`) + status-list + issuer + haproxy | — | `avance-eudi` |
-| `eudi-srv-verifier-local-build` | API del verifier + PKI propia | — | `avance-eudi` |
 | `eudi-srv-trust-validator` | Validador de confianza (LoTL + almacén de anclas) | — | `avance-eudi` |
 | `srv-tl-publisher` | MySQL + publicador de listas + servicio de PKI (AIA/CRLDP) | — | `avance-eudi` |
 | `app-new-wallet` | Solo la app Android (los servicios viven en sus propios proyectos) | — | — |
 | `app-avance-wallet` | Solo la app Android | — | — |
 | `panel-control` | Panel web de operación | — | `avance-eudi` |
+| _(fuera del repo)_ `../eudi-srv-verifier-local-build/` | Verificador genérico (`/verifier`), retirado el 28-oct-2026. | — | — |
 | _(fuera del repo)_ `../Avance_legacy/` | Instantáneas anteriores a la consolidación, movidas fuera de `Avance/` el 27-oct-2026. **No es parte del runtime.** | — | — |
 | `docs/corpus-eudi/` | Corpus ARF/HLR y herramienta de consulta normativa | — | — |
 
@@ -89,7 +87,6 @@ Todos los proyectos siguen la misma convención: el compose vive en
 | `/.well-known/(openid-credential-issuer\|oauth-protected-resource\|jwt-vc-issuer\|jwt-issuer\|oauth-authorization-server\|openid-configuration)/*` | según el sufijo: `haproxy-reg:80` o `haproxy-uis:80` |
 | `/uis-issuer/*` | `haproxy-uis:80` (prefijo intacto) |
 | `/idp-uis/*` | `haproxy-uis:80` (Keycloak de la UIS) |
-| `/verifier/*` | `avance-verifier-api:8080` (se quita el prefijo) |
 | `/status-list/wallet-provider/*` | `status-list-spartans:5000` (se quita el prefijo) |
 | `/status-list/pid-registraduria/*` | `status-list-reg:5000` (se quita el prefijo) |
 | `/status-list/uis-issuer/*` | `status-list-uis:5000` (se quita el prefijo) |
@@ -167,8 +164,9 @@ Consecuencias, y son **restricciones de la infraestructura, no del código**:
 1. **Emisión real desde la app.** La APK tiene que compilarse con el dominio y las listas de
    desarrollo, y hay que recorrer el ciclo completo de emisión PID con la Registraduría y de
    credencial académica con la UIS.
-2. **Verificador contra credencial real.** `/verifier` está levantado y con confianza, pero
-   falta la prueba con una credencial académica emitida de verdad por la UIS.
+2. **Verificador contra credencial real.** El verifier genérico `/verifier` se retiró el 28-oct-2026
+   (ver `../eudi-srv-verifier-local-build/`); la prueba con credencial académica de la UIS se hace con
+   los verifiers de `verifiers/` (p. ej. `/verifier-beca/`).
 3. **Lista `TL/WRPAC` y `TL/WRPRC`.** Hoy el ancla del verifier está en `TL/RPREG` (tipo
    `CA/RPaccess`), que es la lista que el validador consulta para el contexto
    `WalletRelyingPartyAccessCertificate`. Si la Comisión publica la lista con otro nombre,

@@ -45,7 +45,6 @@ REDES=(
   registraduria_default        # eudi-srv-issuer-pid-registraduria
   spartans_default             # eudi-srv-wallet-provider
   srv-tl-publisher_default      # srv-tl-publisher
-  avance-verifier_default      # eudi-srv-verifier-local-build
 )
 REDES_UIS=(
   uis-issuer_default           # eudi-srv-issuer-pid-uis

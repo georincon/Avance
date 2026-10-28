@@ -166,16 +166,10 @@ Sin login. **El issuer UIS no tiene todavía pantalla de solicitación** (hay qu
 Ofrece: `urn:eudi:academic:credential:1` (dc+sd-jwt), `urn:eu.europa.ec.eudi:learning:credential:1`
 y los tipos PID de mdoc.
 
-## 8. `eudi-srv-verifier-local-build` — verificador / Relying Party
+## 8. `eudi-srv-verifier-local-build` — retirado
 
-| Código | Enlace | Qué es |
-|---|---|---|
-| 200 | `/verifier/` | **UI del verificador** (portada) |
-| 200 | `/verifier/verify` | Página de verificación de credenciales |
-| 200 | `/verifier/wallet/public-keys.json` | Claves públicas del verifier |
-| 200 | `/verifier/actuator/health` | Estado del servicio |
-
-Sin login. `/verifier/api/*` exige token (`denyAll` en su `SecurityConfig`).
+Retirado el 28-oct-2026: ya no forma parte del ecosistema; está en `../eudi-srv-verifier-local-build/` (fuera del repo). Los verifiers de los casos de uso (`/verifier-<nombre>`) no dependen de él.
+Los enlaces `/verifier/*` ya no existen. Los verifiers activos están en `/verifier-<nombre>/` (banco, eps, gym, …).
 
 ## 9. `srv-onboarding` — onboarding (identity proofing)
 
@@ -224,9 +218,6 @@ Se listan para saber qué responde y por qué.
 | `/pid-registraduria/issuer/credentialsOffer/create` | Crear oferta de credencial | `POST` |
 | `/pid-registraduria/onboarding/offers` | Puente onboarding → emisión | `POST` |
 | `/uis-issuer/wallet/credentialEndpoint` | Endpoint de credenciales del issuer UIS | `POST` |
-| `/verifier/api/academic/requests` | Crear solicitud de verificación | `POST` |
-| `/verifier/wallet/request.jwt/{id}` | Recurso de la solicitud (OpenID4VP) | `GET`/`POST` |
-| `/verifier/wallet/direct_post/{id}` | Respuesta de la wallet | `POST` |
 | `/onboarding/api/v1/onboarding/sessions/{id}` | Estado de una sesión | `GET` |
 | `/onboarding/api/v1/onboarding/sessions/{id}/contact` · `/contact/verify` · `/consent` | Contacto, OTP y consentimiento | `POST` |
 | `/biometrics/api/verify/face-match` · `/liveness` · `/ocr/id-back` | Biometría y OCR | `POST` |
