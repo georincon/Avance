@@ -202,9 +202,9 @@ function completar(solicitud, r) {
   }
 }
 
-async function consultar(solicitud) {
+async function consultar(solicitud, responseCode) {
   if (solicitud.final) return solicitud.final
-  const r = await verifier.resultado(solicitud.transaccion)
+  const r = await verifier.resultado(solicitud.transaccion, responseCode)
   if (r.estado === 'esperando') {
     if (Date.now() - solicitud.creada > VENCE_SOLICITUD_MS) solicitud.final = { estado: 'rechazada', motivo: 'La solicitud venció. Inténtalo de nuevo.' }
     return solicitud.final ?? r
@@ -274,7 +274,8 @@ r.get('/api/vuelos', (req, res) => {
 
 // Pedirle algo a la wallet a través del verifier: el PID para identificarse, o el tiquete y el PID en el embarque.
 r.post('/api/solicitud', async (req, res) => {
-  const { proposito, demo, previa } = req.body ?? {}
+  const { proposito, demo, previa, dispositivo } = req.body ?? {}
+  const mismo = dispositivo === 'mismo'
   const s = sesion(req, res)
   if (!PEDIDOS[proposito]) return res.status(400).json({ error: 'proposito: identificacion, embarque o permiso' })
   if (proposito === 'permiso') {
@@ -282,9 +283,12 @@ r.post('/api/solicitud', async (req, res) => {
     if (anterior?.sesion !== s.id || !anterior.contexto?.pendientes?.length) return res.status(400).json({ error: 'Primero hay que verificar el tiquete de un menor en un vuelo internacional.' })
   }
   try {
-    const { transaccion, enlace } = await verifier.crearSolicitud({ credenciales: PEDIDOS[proposito](), nonce: randomBytes(16).toString('base64url') })
+    const { transaccion, enlace } = await verifier.crearSolicitud({ credenciales: PEDIDOS[proposito](), nonce: randomBytes(16).toString('base64url'),
+      // En el mismo teléfono la wallet vuelve a /volver al terminar.
+      redireccion: mismo ? `${URL_PUBLICA}/volver` : undefined })
     const id = randomBytes(16).toString('base64url')
-    solicitudes.set(id, { proposito, transaccion, sesion: s.id, creada: Date.now(), demo: proposito === 'embarque' && demo === true, previa: proposito === 'permiso' ? previa : undefined })
+    solicitudes.set(id, { proposito, transaccion, sesion: s.id, creada: Date.now(), demo: proposito === 'embarque' && demo === true, previa: proposito === 'permiso' ? previa : undefined, mismo })
+    if (mismo) s.pendiente = id
     res.json({ id, enlace, qr: await QRCode.toDataURL(enlace, { margin: 1, width: 340 }), vence_en: VENCE_SOLICITUD_MS / 1000 })
   } catch (e) {
     console.error(`[${proposito}] ${e.message}`)
@@ -296,10 +300,31 @@ r.get('/api/solicitud/:id', async (req, res) => {
   const solicitud = solicitudes.get(req.params.id)
   if (!solicitud || solicitud.sesion !== sesion(req, res).id) return res.status(404).json({ estado: 'rechazada', motivo: 'Solicitud desconocida.' })
   try {
+    // Una solicitud del mismo teléfono solo se resuelve en /volver, con el response_code de la wallet.
+    if (solicitud.mismo && !solicitud.final) return res.json({ estado: 'esperando' })
     res.json(await consultar(solicitud))
   } catch (e) {
     console.error(`[${solicitud.proposito}] ${e.message}`)
     res.json({ estado: 'esperando' })
+  }
+})
+
+// A donde vuelve la wallet en el mismo teléfono, con el código que libera el resultado. Deja a la persona en la misma
+// página, que retoma el paso donde estaba (?vuelta=<id>) leyendo el resultado de la sesión.
+r.get('/volver', async (req, res) => {
+  const s = sesion(req, res)
+  const solicitud = solicitudes.get(s.pendiente)
+  const fallo = (motivo) => res.redirect(`${BASE}/?error=${encodeURIComponent(motivo)}`)
+  const codigo = typeof req.query.response_code === 'string' ? req.query.response_code : ''
+  if (!solicitud || solicitud.sesion !== s.id || !solicitud.mismo || !codigo) return fallo('No encontramos la solicitud. Inténtalo de nuevo desde este navegador.')
+  try {
+    if (solicitud.final && solicitud.codigo !== codigo) return fallo('Código de respuesta inválido.')
+    const final = await consultar(solicitud, codigo)
+    if (final.estado === 'listo') { solicitud.codigo = codigo; return res.redirect(`${BASE}/?vuelta=${encodeURIComponent(s.pendiente)}`) }
+    return fallo(final.motivo ?? 'La wallet todavía no ha respondido.')
+  } catch (e) {
+    console.error(`[volver] ${e.message}`)
+    return fallo('El servicio de verificación no está disponible.')
   }
 })
 

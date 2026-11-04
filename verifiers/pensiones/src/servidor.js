@@ -35,6 +35,7 @@ const EMISOR_NOTARIA = `${new URL(URL_PUBLICA).origin}/notaria`
 
 const verifier = crearVerifier({ api: requerida('VERIFIER_API') })
 const solicitudes = new Map()  // id → { transaccion, creada, final? }
+const sesiones = new Map()     // id → { id, pendiente? } (cookie HttpOnly: la wallet vuelve en el mismo navegador)
 const acreditados = []         // { hora, pensionado, documento, vence } más reciente primero
 
 const normal = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim()
@@ -44,8 +45,18 @@ const iniciales = (n) => String(n).split(/\s+/).filter(Boolean).map((x) => `${x[
 setInterval(() => {
   const ahora = Date.now()
   for (const [id, s] of solicitudes) if (ahora - (s.finalizada ?? s.creada) > 15 * 60 * 1000) solicitudes.delete(id)
+  for (const [id, x] of sesiones) if (ahora - x.creada > 60 * 60 * 1000) sesiones.delete(id)
   while (acreditados.length && ahora - acreditados[acreditados.length - 1].hora > CONSERVA_MS) acreditados.pop()
 }, 60 * 1000).unref()
+
+function sesion(req, res) {
+  const id = /(?:^|;\s*)pensiones_sesion=([\w-]+)/.exec(req.headers.cookie ?? '')?.[1]
+  if (id && sesiones.has(id)) return sesiones.get(id)
+  const nueva = randomBytes(24).toString('base64url')
+  sesiones.set(nueva, { id: nueva, creada: Date.now() })
+  res.append('Set-Cookie', `pensiones_sesion=${nueva}; Path=${BASE || '/'}; HttpOnly; Secure; SameSite=Lax`)
+  return sesiones.get(nueva)
+}
 
 const PEDIDO = () => [
   { id: 'fe', vct: VCT_FE_DE_VIDA, datos: ['numero', 'fecha', 'titular_nombre', 'titular_documento', 'entidad_destino', 'vigente_hasta'] },
@@ -70,9 +81,9 @@ function evaluar({ fe, pid }) {
   }
 }
 
-async function consultar(solicitud) {
+async function consultar(solicitud, responseCode) {
   if (solicitud.final) return solicitud.final
-  const r = await verifier.resultado(solicitud.transaccion)
+  const r = await verifier.resultado(solicitud.transaccion, responseCode)
   if (r.estado === 'esperando') {
     if (Date.now() - solicitud.creada > VENCE_SOLICITUD_MS) return fin(solicitud, { estado: 'rechazada', motivo: 'El código venció. Genera uno nuevo.' })
     return r
@@ -100,11 +111,20 @@ r.use('/publico', express.static(new URL('./publico', import.meta.url).pathname,
 r.get('/salud', (_req, res) => res.json({ estado: 'ok' }))
 r.get('/', (_req, res) => res.type('html').set('Cache-Control', 'no-store').send(pagina))
 
-r.post('/api/solicitud', async (_req, res) => {
+r.post('/api/solicitud', async (req, res) => {
+  const { dispositivo } = req.body ?? {}
+  const mismo = dispositivo === 'mismo'
+  const ses = sesion(req, res)
   try {
-    const { transaccion, enlace } = await verifier.crearSolicitud({ credenciales: PEDIDO(), nonce: randomBytes(16).toString('base64url') })
+    const { transaccion, enlace } = await verifier.crearSolicitud({
+      credenciales: PEDIDO(),
+      nonce: randomBytes(16).toString('base64url'),
+      // En el mismo teléfono la wallet vuelve al portal al terminar.
+      redireccion: mismo ? `${URL_PUBLICA}/volver` : undefined,
+    })
     const id = randomBytes(16).toString('base64url')
-    solicitudes.set(id, { transaccion, creada: Date.now() })
+    solicitudes.set(id, { transaccion, creada: Date.now(), sesion: ses.id, mismo })
+    ses.pendiente = id
     res.json({ id, enlace, qr: await QRCode.toDataURL(enlace, { margin: 1, width: 340 }), vence_en: VENCE_SOLICITUD_MS / 1000 })
   } catch (e) {
     console.error(`[solicitud] ${e.message}`)
@@ -113,8 +133,35 @@ r.post('/api/solicitud', async (_req, res) => {
 })
 r.get('/api/solicitud/:id', async (req, res) => {
   const s = solicitudes.get(req.params.id)
-  if (!s) return res.status(404).json({ estado: 'rechazada', motivo: 'Solicitud desconocida.' })
+  if (!s || s.sesion !== sesion(req, res).id) return res.status(404).json({ estado: 'rechazada', motivo: 'Solicitud desconocida.' })
+  // En el mismo teléfono el resultado solo se libera con el response_code que trae /volver: aquí no se sondea el verifier.
+  if (s.mismo && !s.final) return res.json({ estado: 'esperando' })
   try { res.json(await consultar(s)) } catch (e) { console.error(`[solicitud] ${e.message}`); res.json({ estado: 'esperando' }) }
+})
+
+// A donde vuelve la wallet en el mismo teléfono, con el código que libera el resultado. Se consulta aquí (solo con la
+// sesión que creó la solicitud) y se deja el resultado en la solicitud; la página lo recoge en /api/pendiente.
+r.get('/volver', async (req, res) => {
+  const ses = sesion(req, res)
+  const s = solicitudes.get(ses.pendiente)
+  const fallo = (motivo) => res.redirect(`${BASE}/?error=${encodeURIComponent(motivo)}`)
+  if (!s || !s.mismo || s.sesion !== ses.id || !req.query.response_code) return fallo('No encontramos la solicitud. Inténtalo de nuevo desde este navegador.')
+  try {
+    const final = await consultar(s, String(req.query.response_code))
+    if (final.estado === 'listo') return res.redirect(`${BASE}/?volvio=1`)
+    return fallo(final.motivo ?? 'La wallet todavía no ha respondido.')
+  } catch (e) {
+    console.error(`[volver] ${e.message}`)
+    return fallo('El servicio de verificación no está disponible.')
+  }
+})
+// El resultado ya liberado de la solicitud de esta sesión (lo pide la página tras volver de la wallet).
+r.get('/api/pendiente', (req, res) => {
+  const ses = sesion(req, res)
+  const s = solicitudes.get(ses.pendiente)
+  res.set('Cache-Control', 'no-store')
+  if (!s || s.sesion !== ses.id || !s.final) return res.status(404).json({ estado: 'rechazada', motivo: 'No hay un resultado pendiente.' })
+  res.json(s.final)
 })
 r.get('/api/acreditados', (_req, res) => res.set('Cache-Control', 'no-store').json({ acreditados }))
 

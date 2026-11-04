@@ -99,3 +99,7 @@
 .r-tabla table.t-contenedores td a.enlace { display: block; width: fit-content; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .r-tabla table.t-contenedores td .puerto { flex-wrap: wrap; white-space: normal; }
 .r-tabla table.t-contenedores td .est { white-space: normal; }
+
+/* Botón de salir: cierra la sesión en este navegador (borra la clave guardada) y vuelve a /login */
+.boton-salir{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid #dde5ec;border-radius:8px;background:#fff;color:#a44239;font:600 11px 'DM Sans',sans-serif;cursor:pointer}
+.boton-salir:hover{background:#fdecea;border-color:#f0c4be}.boton-salir span{font-size:14px}

@@ -190,3 +190,25 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
 main { flex: 1; width: 100%; }
 .pie { margin-top: auto; }
 @media (max-width: 680px) { .accesos { display: none; } }
+
+/* Botones de acción: apilados, con aire entre ellos y del mismo ancho. */
+.acciones-pila { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; max-width: 460px; }
+.acciones-pila button { width: 100%; padding: 14px 20px; line-height: 1.25; text-align: center; }
+.acciones-fila { display: flex; flex-direction: column; gap: 10px; min-width: 130px; }
+.acciones-fila button { width: 100%; min-height: 44px; padding: 10px 16px; font-size: .95rem; }
+@media (min-width: 720px) { .acciones-pila { flex-direction: row; flex-wrap: wrap; max-width: none; } .acciones-pila button { width: auto; flex: 1 1 280px; } }
+
+/* En el celular las tablas se vuelven tarjetas: una por fila, cada dato con su nombre. */
+@media (max-width: 640px) {
+  table.tarjetas, table.tarjetas tbody, table.tarjetas tr, table.tarjetas td { display: block; width: 100%; }
+  table.tarjetas { background: transparent; border-radius: 0; overflow: visible; }
+  table.tarjetas thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.tarjetas tr { background: #fff; border: 1px solid var(--borde); border-radius: 14px; padding: 6px 16px 14px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(10,60,90,.06); }
+  table.tarjetas td { border-bottom: 1px solid var(--borde); padding: 10px 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; text-align: right; }
+  table.tarjetas td::before { content: attr(data-label); flex: none; color: var(--suave); font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; text-align: left; }
+  table.tarjetas td:last-child { border-bottom: 0; }
+  table.tarjetas td.celda-acciones { display: block; padding: 14px 0 0; text-align: left; }
+  table.tarjetas td.celda-acciones:empty { display: none; }
+  table.tarjetas td.celda-acciones::before { content: none; }
+  table.tarjetas .acciones-fila { min-width: 0; }
+}

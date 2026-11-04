@@ -52,6 +52,7 @@
   dialog { border: 0; border-radius: 12px; padding: 0; width: min(480px, calc(100vw - 28px)); box-shadow: 0 24px 70px rgba(0,0,0,.4); border-top: 6px solid var(--amarillo); } dialog::backdrop { background: rgba(11,42,91,.72); }
   .modal { padding: 26px; text-align: center; } .modal h2 { margin: 0 0 4px; color: var(--azul); } .modal .qr { width: 250px; max-width: 100%; border: 1px solid var(--linea); border-radius: 10px; padding: 6px; margin: 10px auto; display: block; }
   .pide { text-align: left; background: var(--gris); border-radius: 8px; padding: 10px 14px; font-size: .86rem; color: var(--suave); margin: 10px 0; } .pide b { color: var(--tinta); } .cuenta { color: var(--suave); font-size: .85rem; min-height: 1.3em; }
+  .solo-movil { display: none; } .boton-wallet { display: block; background: var(--amarillo); color: var(--azul); padding: 14px 28px; border-radius: 6px; font-weight: 800; box-shadow: 0 3px 0 var(--amarillo-osc); margin: 12px 0; }
   .acciones { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
   footer { background: var(--azul); color: #b9c6e0; font-size: .85rem; border-top: 6px solid var(--amarillo); } footer .contenedor { padding-top: 26px; padding-bottom: 26px; display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 20px; } @media (max-width: 860px) { footer .contenedor { grid-template-columns: 1fr; } } footer b { color: #fff; display: block; margin-bottom: 6px; } footer a { display: block; padding: 2px 0; }
 </style>
@@ -97,6 +98,7 @@
   const BASE = '{{BASE}}'
   const $ = (id) => document.getElementById(id)
   const modal = $('modal'), m = $('m')
+  const MOVIL = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
   let sondeo = null, cuenta = null
   function el(tag, props = {}, ...hijos) {
     const e = document.createElement(tag)
@@ -112,15 +114,16 @@
 
   async function comprobar() {
     parar(); m.replaceChildren(el('p', { class: 'cuenta' }, 'Preparando el código…')); if (!modal.open) modal.showModal()
-    const { ok, cuerpo } = await api('/api/solicitud', { method: 'POST' })
+    const { ok, cuerpo } = await api('/api/solicitud', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dispositivo: MOVIL ? 'mismo' : 'otro' }) })
     if (!ok) { m.replaceChildren(el('h2', {}, 'No se pudo'), el('div', { class: 'aviso' }, cuerpo.error ?? 'Error'), el('div', { class: 'acciones' }, el('button', { class: 'claro', onclick: cerrar }, 'Cerrar'))); return }
     const restante = el('div', { class: 'cuenta' })
-    m.replaceChildren(el('h2', { id: 'm-titulo' }, 'Prueba de supervivencia'), el('p', { class: 'cuenta' }, 'Escanea con tu wallet y elige tu fe de vida.'),
-      el('img', { class: 'qr', src: cuerpo.qr, alt: 'Código QR' }), restante,
+    m.replaceChildren(el('h2', { id: 'm-titulo' }, 'Prueba de supervivencia'), el('p', { class: 'cuenta' }, MOVIL ? 'Abre tu wallet y elige tu fe de vida. Volverás aquí automáticamente.' : 'Escanea con tu wallet y elige tu fe de vida.'),
+      MOVIL ? el('a', { class: 'boton-wallet solo-movil', style: 'display:block', href: cuerpo.enlace }, 'Abrir mi wallet') : el('img', { class: 'qr', src: cuerpo.qr, alt: 'Código QR' }), restante,
       el('div', { class: 'pide' }, el('b', {}, 'Se pide: '), 'tu fe de vida notarial (constancia, titular, vigencia) y, de tu documento de identidad, nombre y número de documento.'),
       el('div', { class: 'acciones' }, el('button', { class: 'claro', onclick: () => navigator.clipboard?.writeText(cuerpo.enlace) }, 'Copiar enlace'), el('button', { class: 'claro', onclick: cerrar }, 'Cancelar')))
     const limite = Date.now() + cuerpo.vence_en * 1000
     cuenta = setInterval(() => { const s = Math.max(0, Math.round((limite - Date.now()) / 1000)); restante.textContent = `El código vence en ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }, 1000)
+    if (MOVIL) return   // la wallet vuelve a /volver y la página recoge el resultado al cargar
     sondeo = setInterval(async () => {
       const { cuerpo: r } = await api('/api/solicitud/' + cuerpo.id)
       if (r.estado === 'listo') { parar(); modal.close(); mostrar(r.supervivencia); cargar() }
@@ -143,7 +146,18 @@
     $('vacio').hidden = l.length > 0
     $('registro').replaceChildren(...l.map((x) => el('li', {}, el('div', {}, el('b', {}, x.pensionado), el('small', {}, `Documento ${x.documento} · próxima antes del ${fecha(x.vence)}`)), el('small', {}, new Date(x.hora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })))))
   }
-  $('comprobar').addEventListener('click', comprobar); cargar()
+  // Al volver de la wallet (mismo teléfono): /volver redirige con ?volvio=1 (resultado ya liberado) o ?error=…
+  async function alVolver() {
+    const q = new URLSearchParams(location.search)
+    if (!q.has('volvio') && !q.has('error')) return
+    history.replaceState(null, '', BASE + '/')
+    $('prueba').scrollIntoView()
+    if (q.has('error')) { $('resultado').replaceChildren(el('div', { class: 'panel' }, el('div', { class: 'aviso' }, q.get('error')), el('div', { class: 'acciones', style: 'justify-content:flex-start' }, el('button', { class: 'sol', onclick: comprobar }, 'Intentar de nuevo')))); return }
+    const { ok, cuerpo } = await api('/api/pendiente')
+    if (ok && cuerpo.estado === 'listo') mostrar(cuerpo.supervivencia)
+    else $('resultado').replaceChildren(el('div', { class: 'panel' }, el('div', { class: 'aviso' }, cuerpo.motivo ?? 'No se pudo recuperar el resultado.'), el('div', { class: 'acciones', style: 'justify-content:flex-start' }, el('button', { class: 'sol', onclick: comprobar }, 'Intentar de nuevo'))))
+  }
+  $('comprobar').addEventListener('click', comprobar); cargar(); alVolver()
 })()
 </script>
 </body>

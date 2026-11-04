@@ -157,6 +157,7 @@ Cada base publica un puerto distinto, solo en `127.0.0.1`. Se pueden cambiar con
 | `postgres-spartans` (`spartans`) | PostgreSQL | 5435 | `SPARTANS_DB_PORT` |
 | `onboarding-postgres` (`onboarding`) | PostgreSQL | 5436 | `ONBOARDING_DB_PORT` |
 | `postgres-reg` (`pid_issuer`) | PostgreSQL | 5441 | `REG_DB_PORT` |
+| `postgres-tra` (`transito_issuer`) | PostgreSQL | 5437 | `TRA_DB_PORT` |
 | `tlp-db` (`trusted_lists`) | MySQL | 3307 | `TLP_DB_PORT` |
 
 La vista «Recursos» filtra por tipo (Issuer, Verifier, Portal, Base de datos, Wallet…) y la búsqueda también encuentra
@@ -166,3 +167,20 @@ La última columna de «Recursos» (**Enlaces**) lleva a la página de cada serv
 consolas de Keycloak, metadatos de los emisores, JWKS del Wallet Provider, etc. Las bases de datos tienen «Copiar JDBC».
 Lo que no tiene página propia enlaza a su proyecto. Las rutas están en `ENLACES_FIJOS` de `server.js`; al añadir un servicio
 con página nueva, se agrega allí (solo páginas que respondan).
+
+## Descarga de la wallet: siempre la última versión
+
+El QR del panel apunta a una URL fija (`/descargas/wallet.apk`) que sirve el APK más reciente de `app-new-wallet/app/build/outputs/apk`; no hay que cambiar el QR.
+Cada vez que se carga la página (y cada vez que se vuelve a la pestaña) el panel pregunta `/descargas/apk.json` (sin caché), muestra fecha, tamaño y huella, y avisa
+«Hay una versión nueva…» si la huella cambió desde la última visita. Para publicar una versión: `./app-new-wallet/publicar-wallet.sh` (compila con los parámetros del
+ecosistema, borra APK viejos para que no ganen por fecha y comprueba que el panel ofrece la huella nueva; `INSTALAR=1` además instala por adb).
+
+
+## Ingreso al panel (`/login`)
+
+El panel ya no pide la clave en una ventana emergente: `/login` es una página de ingreso. Pide el `CONTROL_PANEL_TOKEN`, lo valida contra
+`GET /api/session` (con un tope de 5 intentos fallidos por minuto y por IP) y lo guarda solo en el navegador (`localStorage`). Sin clave, o
+con una clave que deje de ser válida, el panel y la página de recursos redirigen a `/login`.
+
+La misma página muestra, sin pedir clave, la **descarga de la wallet**: QR, botón de descarga, enlace para copiar y los datos del APK más
+reciente (`/descargas/apk.json`). Esas rutas `/descargas/*` son públicas porque las abre el teléfono.

@@ -41,8 +41,9 @@ const entries = [
   // cookies a "/", asi que dos instancias de Keycloak en el mismo dominio
   // comparten AUTH_SESSION_ID y KC_RESTART, y la segunda consola pisa a la
   // primera. Ver README.md, seccion "Los dos Keycloak".
-  { id:'issuer-registraduria', name:'Issuer Registraduría', group:'Servicios de identidad', folder:'eudi-srv-issuer-pid-registraduria/docker-compose', compose:'docker-compose.yaml', url:'/pid-registraduria/', icon:'badge', description:'Emisión de identidad PID', keycloakService:'keycloak', keycloakUrl:'/idp-reg/admin/master/console/', keycloakName:'Keycloak de la Registraduría', peerId:'issuer-uis', peerName:'Issuer UIS', containers:['haproxy-reg','keycloak-reg','pid-issuer-reg','postgres-reg','status-list-reg'], services:['haproxy','keycloak','pid-issuer','postgres','status-list'] },
-  { id:'issuer-uis', name:'Issuer UIS', group:'Servicios de identidad', folder:'eudi-srv-issuer-pid-uis/docker-compose', compose:'docker-compose.yaml', url:'/uis-issuer/', icon:'badge', description:'Emisión de credenciales PuB-EAA (UIS)', keycloakService:'keycloak-uis', keycloakUrl:'/idp-uis/admin/master/console/', keycloakName:'Keycloak de la UIS', peerId:'issuer-registraduria', peerName:'Issuer Registraduría', containers:['haproxy-uis','keycloak-uis','uis-issuer','postgres-uis-issuer','postgres-uis-academic','status-list-uis'], services:['haproxy-uis','keycloak-uis','uis-issuer','postgres-uis-issuer','postgres-uis-academic','status-list-uis'] },
+  { id:'issuer-registraduria', name:'Issuer Registraduría', group:'Servicios de identidad', folder:'eudi-srv-issuer-pid-registraduria/docker-compose', compose:'docker-compose.yaml', url:'/pid-registraduria/', icon:'badge', description:'Emisión de identidad PID', keycloakService:'keycloak', keycloakUrl:'/idp-reg/admin/master/console/', keycloakName:'Keycloak de la Registraduría', peerIds:['issuer-uis','issuer-transito'], peerName:'Issuer UIS / Tránsito', containers:['haproxy-reg','keycloak-reg','pid-issuer-reg','postgres-reg','status-list-reg'], services:['haproxy','keycloak','pid-issuer','postgres','status-list'] },
+  { id:'issuer-transito', name:'Issuer Tránsito', group:'Servicios de identidad', folder:'eudi-srv-issuer-pid-transito/docker-compose', compose:'docker-compose.yaml', url:'/pid-transito/', icon:'license', description:'Emisión de la licencia de conducción móvil (mDL)', keycloakService:'keycloak-tra', keycloakUrl:'/idp-tra/admin/master/console/', keycloakName:'Keycloak del Tránsito', peerIds:['issuer-registraduria','issuer-uis'], peerName:'Issuer Registraduría / UIS', containers:['haproxy-tra','keycloak-tra','transito-issuer','postgres-tra','status-list-tra'], services:['haproxy-tra','keycloak-tra','transito-issuer','postgres-tra','status-list-tra'] },
+  { id:'issuer-uis', name:'Issuer UIS', group:'Servicios de identidad', folder:'eudi-srv-issuer-pid-uis/docker-compose', compose:'docker-compose.yaml', url:'/uis-issuer/', icon:'badge', description:'Emisión de credenciales PuB-EAA (UIS)', keycloakService:'keycloak-uis', keycloakUrl:'/idp-uis/admin/master/console/', keycloakName:'Keycloak de la UIS', peerIds:['issuer-registraduria','issuer-transito'], peerName:'Issuer Registraduría / Tránsito', containers:['haproxy-uis','keycloak-uis','uis-issuer','postgres-uis-issuer','postgres-uis-academic','status-list-uis'], services:['haproxy-uis','keycloak-uis','uis-issuer','postgres-uis-issuer','postgres-uis-academic','status-list-uis'] },
   { id:'wallet-provider', name:'Wallet Provider (único)', group:'Servicios de wallet', folder:'eudi-srv-wallet-provider/docker-compose', compose:'docker-compose.yaml', url:'/wallet-provider/', icon:'database', description:'Proveedor de wallet: emite WUA y Key Attestations', containers:['spartans-wallet-provider','postgres-spartans','status-list-spartans'], services:['spartans-wallet-provider','postgres-spartans','status-list-spartans'] },
   { id:'onboarding', name:'Onboarding', group:'Aplicaciones', folder:'srv-onboarding/docker-compose', compose:'docker-compose.yaml', url:'/onboarding/', icon:'wallet', description:'Onboarding de usuario (identity proofing)', containers:['onboarding-backend','onboarding-biometrics','onboarding-postgres'], services:['onboarding-backend','onboarding-biometrics','onboarding-postgres'] },
   { id:'app-new-wallet', name:'App New Wallet (ancla)', group:'Aplicaciones', folder:'app-new-wallet/docker-compose', compose:'docker-compose.yaml', url:'', icon:'wallet', description:'Ancla de la app Android en la red compartida: sin ella la app no alcanza al ecosistema', containers:['newwallet-anchor'], services:['network-anchor'] },
@@ -141,14 +142,14 @@ function publicProject(project, state, running, total, error, keycloak) {
 async function keycloakState(project) {
   if (!project.keycloakService) return null;
   const propio = await serviceRunning(project, project.keycloakService);
-  const par = projects.find((item) => item.id === project.peerId);
-  const parActivo = par ? await serviceRunning(par, par.keycloakService) : false;
+  const pares = (project.peerIds || []).map((id) => projects.find((item) => item.id === id)).filter(Boolean);
+  const parActivo = (await Promise.all(pares.map((par) => serviceRunning(par, par.keycloakService)))).some(Boolean);
   return {
     service: project.keycloakService,
     name: project.keycloakName,
     url: project.keycloakUrl,
     running: propio,
-    peerId: project.peerId,
+    peerIds: project.peerIds,
     peerName: project.peerName,
     peerRunning: parActivo,
     // Las dos a la vez es exactamente el estado que rompe la sesion.
@@ -413,7 +414,9 @@ const L = (texto, url) => ({ texto, url });
 const ENLACES_FIJOS = {
   'haproxy-reg': [L('Emisor PID', '/pid-registraduria/'), L('Metadatos', '/pid-registraduria/.well-known/openid-credential-issuer')],
   'keycloak-reg': [L('Consola Keycloak', '/idp-reg/admin/master/console/')],
-  'haproxy-uis': [L('Emisor UIS', '/uis-issuer/')],
+  'haproxy-tra': [L('Emisor mDL', '/pid-transito/'), L('Metadatos', '/pid-transito/.well-known/openid-credential-issuer')],
+  'keycloak-tra': [L('Consola Keycloak', '/idp-tra/admin/master/console/')],
+  'haproxy-uis': [L('Emisor UIS', '/uis-issuer/'), L('Panel de estudiantes', '/uis-issuer/uis/admin/estudiantes'), L('Verifier de la UIS (PID)', '/verifier-uis/')],
   'keycloak-uis': [L('Consola Keycloak', '/idp-uis/admin/master/console/')],
   'spartans-wallet-provider': [L('Wallet Provider', '/wallet-provider/'), L('JWKS', '/jwks'), L('Metadatos', '/.well-known/oauth-protected-resource')],
   'onboarding-backend': [L('Onboarding', '/onboarding/')],
@@ -512,6 +515,7 @@ function send(res, code, data) {
   res.writeHead(code, {'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'});
   res.end(body);
 }
+const fallosLogin = new Map();
 function authorized(req) {
   const value = req.headers.authorization || '';
   const supplied = value.startsWith('Bearer ') ? Buffer.from(value.slice(7)) : Buffer.alloc(0);
@@ -604,7 +608,18 @@ const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url, 'http://localhost').pathname;
   if (pathname.startsWith('/descargas/')) return descargas(req, res, pathname).catch(() => { if (!res.headersSent) res.writeHead(500); res.end(); });
   if (pathname.startsWith('/api/')) {
-    if (!authorized(req)) return send(res, 401, {error:'Token de acceso incorrecto o ausente.'});
+    if (!authorized(req)) {
+      // Tope de intentos fallidos por IP al comprobar la clave desde la página de ingreso (5 por minuto).
+      if (pathname === '/api/session') {
+        const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',').pop().trim();
+        const ahora = Date.now();
+        const reg = (fallosLogin.get(ip) || []).filter((t) => ahora - t < 60_000);
+        if (reg.length >= 5) return send(res, 429, {error:'Demasiados intentos. Espera un minuto.'});
+        reg.push(ahora); fallosLogin.set(ip, reg);
+      }
+      return send(res, 401, {error:'Token de acceso incorrecto o ausente.'});
+    }
+    if (pathname === '/api/session') return send(res, 200, {ok:true});
     if (pathname === '/api/projects' && req.method === 'GET') return send(res, 200, await Promise.all(projects.map(status)));
     if (pathname === '/api/recursos' && req.method === 'GET') {
       try { return send(res, 200, await recursos()); } catch (error) { return send(res, 500, {error:error.message}); }
@@ -643,9 +658,9 @@ const server = http.createServer(async (req, res) => {
           //    consolas compartan sesion: el proxy publico deja el Path de las
           //    cookies en "/", asi que un AUTH_SESSION_ID compartido invalida la
           //    sesion del otro Keycloak en cuanto se entra en su consola.
-          const par = projects.find((item) => item.id === project.peerId);
-          if (par) {
-            await run(composeArgs({ ...par, composeFiles: composeDe(par) }, ['stop', par.keycloakService]), par.directory, 5 * 60_000);
+          for (const parId of project.peerIds || []) {
+            const par = projects.find((item) => item.id === parId);
+            if (par) await run(composeArgs({ ...par, composeFiles: composeDe(par) }, ['stop', par.keycloakService]), par.directory, 5 * 60_000);
           }
           // 2) Se levanta el Keycloak de este emisor.
           await run(composeArgs({ ...project, composeFiles: composeDe(project) }, ['up','-d', project.keycloakService]), project.directory, 10 * 60_000);
@@ -688,7 +703,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, {error:'Ruta no encontrada.'});
   }
 
-  const relative = pathname === '/' ? 'index.html' : pathname === '/recursos' ? 'recursos.html' : decodeURIComponent(pathname.slice(1));
+  const relative = pathname === '/' ? 'index.html' : pathname === '/recursos' ? 'recursos.html' : pathname === '/login' ? 'login.html' : decodeURIComponent(pathname.slice(1));
   const file = path.resolve(projectDir, relative);
   if (!file.startsWith(projectDir + path.sep)) {
     res.writeHead(403);

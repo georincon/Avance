@@ -81,6 +81,8 @@
   .pide { background: var(--gris); padding: 12px 14px; font-size: .9rem; color: var(--suave); margin: 0 0 14px; } .pide b { color: var(--tinta); }
   .aviso { background: #fff7d6; color: #5c4a00; border-left: 4px solid #e0b400; padding: 10px 14px; font-size: .9rem; margin: 0 0 14px; }
   .acciones { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 16px; }
+  .boton-wallet { display: block; text-align: center; text-decoration: none; background: var(--cardenal); color: #fff; font-weight: 600; padding: 14px 22px; margin: 8px 0 12px; border: 2px solid var(--cardenal); }
+  .boton-wallet:hover { background: var(--cardenal-osc); }
   .cuenta { color: var(--suave); font-size: .85rem; text-align: center; min-height: 1.3em; }
   .cargando { text-align: center; color: var(--suave); padding: 30px 0; }
   .sello { display: inline-flex; align-items: center; gap: 8px; background: var(--ok-fondo); color: var(--ok); font-weight: 600; padding: 6px 12px; margin-bottom: 12px; }
@@ -153,6 +155,7 @@
     <div class="caja no"><h2>Lo que no se pide</h2><ul>
       <li>Nombre, documento y fecha de nacimiento (solo si luego confirmas tu identidad)</li><li>Créditos, datos de contacto y cualquier otro dato</li></ul></div>
   </section>
+  <div class="aviso" id="error" role="alert" hidden style="border-left-color:var(--cardenal);background:var(--error-fondo);color:var(--error)"></div>
   <section id="compartidos" hidden aria-live="polite">
     <h2>Resultados</h2>
     <p>Lo que se evaluó en cada convocatoria. Solo se muestra en esta pantalla.</p>
@@ -178,6 +181,16 @@
   let sondeo = null, cuenta = null
   const resultados = new Map()   // clave de convocatoria -> { conv, id, evaluacion, radicado, identidad, hora } (solo en memoria)
   let convocatorias = []
+  // En el mismo teléfono la wallet abre otra app y vuelve con una carga nueva de la página: lo que está en memoria se
+  // pierde. Por eso se guardan en sessionStorage solo los ids de las solicitudes (no datos de la persona); los resultados
+  // se piden de nuevo al servidor, que los conserva unos minutos y solo los entrega a la sesión que los creó.
+  const MOVIL = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  const leerGuardado = () => { try { return JSON.parse(sessionStorage.getItem('beca_resultados') ?? '{}') } catch { return {} } }
+  const guardar = () => {
+    try {
+      sessionStorage.setItem('beca_resultados', JSON.stringify(Object.fromEntries([...resultados].map(([k, v]) => [k, { pre: v.id, ident: v.identId, hora: v.hora.getTime() }]))))
+    } catch {}
+  }
   // Miniaturas de cada convocatoria: formas geométricas sobrias en rojo cardenal y gris plata (SVG propio, sin datos de nadie).
   const arte = (marcado) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 150' preserveAspectRatio='xMidYMid slice'>${marcado}</svg>`)}")`
   const ARTE = {
@@ -212,7 +225,7 @@
     if (!modal.open) modal.showModal()
     const { ok, cuerpo } = await api('/api/solicitud', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ convocatoria: conv.clave, paso, previa }),
+      body: JSON.stringify({ convocatoria: conv.clave, paso, previa, dispositivo: MOVIL ? 'mismo' : 'otro' }),
     })
     if (!ok) return mostrarError(cuerpo.error ?? 'No se pudo crear la solicitud.', conv, paso, previa)
     mostrarQr(conv, paso, previa, cuerpo)
@@ -223,10 +236,10 @@
     const restante = el('div', { class: 'cuenta' })
     contenido.replaceChildren(
       el('h2', { id: 'titulo' }, identidad ? `Confirmar identidad · ${conv.nombre}` : conv.nombre),
-      el('p', { class: 'sub' }, identidad ? 'Último paso: tu wallet comparte quién eres para radicar la solicitud.' : 'Escanea el código con tu wallet.'),
-      el('img', { class: 'qr', src: s.qr, alt: 'Código QR para escanear con la wallet' }),
+      el('p', { class: 'sub' }, identidad ? 'Último paso: tu wallet comparte quién eres para radicar la solicitud.' : (MOVIL ? 'Abre tu wallet para compartir.' : 'Escanea el código con tu wallet.')),
+      MOVIL ? el('a', { class: 'boton-wallet', href: s.enlace }, 'Abrir mi wallet') : el('img', { class: 'qr', src: s.qr, alt: 'Código QR para escanear con la wallet' }),
       restante,
-      el('ol', { class: 'pasos' }, el('li', {}, 'Abre tu wallet y escanea el código.'), el('li', {}, 'Revisa las credenciales que se piden y acepta.'), el('li', {}, 'El resultado aparece aquí.')),
+      el('ol', { class: 'pasos' }, el('li', {}, MOVIL ? 'Toca «Abrir mi wallet».' : 'Abre tu wallet y escanea el código.'), el('li', {}, 'Revisa las credenciales que se piden y acepta.'), el('li', {}, MOVIL ? 'Volverás aquí automáticamente con el resultado.' : 'El resultado aparece aquí.')),
       el('div', { class: 'pide' },
         el('b', {}, 'Se pide: '), identidad ? 'Tu documento de identidad: nombres, apellidos y número de documento.' : 'Documento de identidad (solo «mayor de 18») + credencial académica (nivel, estado, programa, título y promedio).',
         el('br'), el('b', {}, 'Condiciones: '), conv.requisitos.join(' · ')),
@@ -238,6 +251,7 @@
       const seg = Math.max(0, Math.round((limite - Date.now()) / 1000))
       restante.textContent = `El código vence en ${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`
     }, 1000)
+    if (MOVIL) return   // la wallet vuelve a /volver y la página recupera el resultado al cargarse
     sondeo = setInterval(async () => {
       const { cuerpo } = await api('/api/solicitud/' + s.id)
       if (cuerpo.estado === 'listo') { parar(); registrar(conv, s.id, paso, cuerpo) }
@@ -250,12 +264,14 @@
     resultados.set(conv.clave, {
       conv,
       id: paso === 'preevaluacion' ? id : previo?.id ?? id,
+      identId: paso === 'identidad' ? id : previo?.identId,
       evaluacion: r.evaluacion ?? previo?.evaluacion,
       identidad: r.identidad ?? previo?.identidad,
       radicado: r.radicado ?? previo?.radicado,
       hora: previo?.hora ?? new Date(),
     })
-    modal.close()
+    if (modal.open) modal.close()
+    guardar()
     pintar(conv.clave)
   }
 
@@ -279,7 +295,7 @@
       ]
       if (i) hijos.push(el('h3', {}, 'Solicitud radicada'), el('div', { class: 'radicado' }, radicado),
         el('dl', {}, fila('Nombres', i.nombres), fila('Apellidos', i.apellidos), fila('Documento', i.documento)))
-      const acciones = [el('button', { class: 's', onclick: () => { resultados.delete(conv.clave); pintar() } }, 'Quitar de la pantalla')]
+      const acciones = [el('button', { class: 's', onclick: () => { resultados.delete(conv.clave); guardar(); pintar() } }, 'Quitar de la pantalla')]
       if (ev.cumple && !i) acciones.unshift(el('button', { class: 'p', onclick: () => iniciar(conv, 'identidad', id) }, `Continuar y radicar ${conv.tipo === 'Beca' ? 'la postulación' : 'la inscripción'}`))
       hijos.push(el('div', { class: 'acciones' }, ...acciones))
       return el('article', { class: `compartido${conv.clave === nuevo ? ' nuevo' : ''}`, style: ev.cumple ? '' : 'border-color:var(--error);border-left-color:var(--error)' }, ...hijos)
@@ -305,7 +321,32 @@
       return { ...c, boton, caja }
     })
     $('convocatorias-lista').replaceChildren(...convocatorias.map((c) => c.caja))
+    return restaurar()
   })
+
+  // Al cargar: recupera los resultados de esta sesión del navegador y, si la wallet acaba de volver (?volver=<id>),
+  // el de esa solicitud.
+  async function restaurar() {
+    const params = new URLSearchParams(location.search)
+    const error = params.get('error'), volver = params.get('volver')
+    if (error || volver) history.replaceState(null, '', BASE + '/')
+    if (error) { $('error').hidden = false; $('error').textContent = error }
+    const pedir = async (id) => { const { ok, cuerpo } = await api('/api/solicitud/' + encodeURIComponent(id)); return ok && cuerpo.estado === 'listo' ? cuerpo : null }
+    for (const [clave, g] of Object.entries(leerGuardado())) {
+      const conv = convocatorias.find((c) => c.clave === clave)
+      const pre = conv && await pedir(g.pre)
+      if (!pre?.evaluacion) continue
+      const ident = g.ident ? await pedir(g.ident) : null
+      resultados.set(clave, { conv, id: g.pre, identId: ident ? g.ident : undefined, evaluacion: pre.evaluacion, identidad: ident?.identidad, radicado: ident?.radicado, hora: new Date(g.hora) })
+    }
+    if (volver) {
+      const r = await pedir(volver)
+      const conv = r && convocatorias.find((c) => c.clave === r.clave)
+      if (conv) return registrar(conv, volver, r.paso, r)
+      $('error').hidden = false; $('error').textContent = 'No se pudo recuperar el resultado. Inténtalo de nuevo.'
+    }
+    if (resultados.size) { guardar(); pintar() }
+  }
 })()
 </script>
 </body>

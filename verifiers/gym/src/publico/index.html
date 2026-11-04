@@ -203,20 +203,20 @@ async function vistaMiGym() {
       el('tbody', {}, ...s.credenciales.map((e) => el('tr', {},
         el('td', {}, 'Tarjeta de socio'), el('td', {}, fecha(e.fecha)),
         el('td', {}, el('span', { class: `etiqueta ${e.estado}` }, e.estado === 'vigente' ? 'Vigente' : e.estado === 'reemplazada' ? 'Reemplazada' : 'Revocada')),
-        el('td', {}, e.estado === 'vigente' ? el('button', { class: 'peligro', onclick: async () => { await api(`/api/credenciales/${e.indice}/revocar`, { method: 'POST' }); vistaMiGym() } }, 'Revocar') : '')))))) :
+        el('td', {}, e.estado === 'vigente' ? [el('button', { class: 'primario', style: 'margin-right:6px', title: 'Pide una tarjeta nueva; al recibirla, la anterior deja de valer', onclick: () => entregar(true) }, 'Reexpedir'), el('button', { class: 'peligro', onclick: async () => { await api(`/api/credenciales/${e.indice}/revocar`, { method: 'POST' }); vistaMiGym() } }, 'Revocar')] : '')))))) :
       el('p', { class: 'lead' }, 'Todavía nada.'),
-    el('p', { style: 'color:var(--suave);font-size:.9rem;margin-top:12px' }, 'Si renuevas o te suspenden, la tarjeta anterior queda reemplazada: la puerta solo acepta la última. Si pierdes el teléfono, revócala.'))
+    el('p', { style: 'color:var(--suave);font-size:.9rem;margin-top:12px' }, 'Si renuevas o te suspenden, la tarjeta anterior queda reemplazada: la puerta solo acepta la última. Si pierdes el teléfono o cambias de celular, pulsa Reexpedir: recibes una tarjeta nueva y la anterior deja de valer.'))
 }
 
-async function entregar() {
+async function entregar(reexpedir = false) {
   try {
-    const o = await api('/api/oferta', { method: 'POST', body: {} })
+    const o = await api('/api/oferta', { method: 'POST', body: { reexpedir } })
     vista.replaceChildren(el('button', { class: 'volver', onclick: () => (location.hash = 'mi-gym') }, '← Volver a mi membresía'),
       el('h1', {}, 'Recibe tu tarjeta de socio'),
       el('div', { class: 'caja entrega' },
         MOVIL ? el('a', { class: 'boton primario', href: o.enlace }, 'Recibir en mi wallet') : el('img', { src: o.qr, alt: 'Código QR con la oferta' }),
         el('div', {}, el('p', {}, MOVIL ? 'Toca el botón y, cuando tu wallet lo pida, escribe este PIN:' : 'Escanéalo con tu wallet y, cuando lo pida, escribe este PIN:'),
-          el('div', { class: 'pin' }, o.pin), el('p', {}, 'La oferta vale 15 minutos y sirve una vez.'))))
+          el('div', { class: 'pin' }, o.pin), el('p', {}, 'La oferta vale 15 minutos y sirve una vez.'), reexpedir ? el('p', { style: 'color:var(--suave)' }, 'Al recibirla, la tarjeta anterior deja de valer.') : '')))
   } catch (e) { vista.prepend(el('div', { class: 'aviso error', style: 'margin-bottom:12px' }, e.message)) }
 }
 

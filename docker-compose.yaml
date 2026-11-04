@@ -47,6 +47,7 @@ name: avance
 include:
   # ── Servicios de identidad ──
   - path: eudi-srv-issuer-pid-registraduria/docker-compose/docker-compose.yaml
+  - path: eudi-srv-issuer-pid-transito/docker-compose/docker-compose.yaml
   # ── Servicios de wallet ──
   - path: eudi-srv-wallet-provider/docker-compose/docker-compose.yaml
   # ── Aplicaciones ──

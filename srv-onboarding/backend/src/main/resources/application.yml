@@ -2,6 +2,11 @@ spring:
   application:
     name: onboarding-backend
 
+  web:
+    resources:
+      # webroot/ se monta en /webroot (ver docker-compose); si no existe, se ignora.
+      static-locations: classpath:/static/,file:${WEBROOT_PATH:/webroot}/
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/onboarding}
     username: ${DB_USER:onboarding}
@@ -77,6 +82,16 @@ onboarding:
     face-match-threshold: 0.363
     face-match-review-below: 0.40
     liveness-threshold: 0.50
+  # Endpoints server-to-server del issuer (comparar la selfie guardada con la foto del registro). Sin clave: 503.
+  internal:
+    api-key: ${ONBOARDING_INTERNAL_API_KEY:}
+  # «Perdi mi celular»: revocacion de credenciales sin la wallet (CIR 2024/2979 art. 6(3)(b)(c)).
+  # Si falta issuer-url o issuer-api-key, los endpoints /api/v1/lost-device/** responden 503.
+  lost-device:
+    issuer-url: ${ONBOARDING_LOSTDEVICE_ISSUER_URL:}
+    issuer-api-key: ${ONBOARDING_LOSTDEVICE_ISSUER_APIKEY:}
+    max-per-document-per-hour: 3
+    max-per-ip-per-hour: 10
   storage:
     provider: local
     local-path: ${STORAGE_LOCAL_PATH:./data/uploads}

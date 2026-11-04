@@ -102,3 +102,7 @@
 .reg-caja li.vacio{color:#9aa7b4;list-style:none;margin-left:-16px}
 @media(max-width:1100px){.registro{grid-template-columns:repeat(2,minmax(0,1fr))}.descarga{flex-direction:column;align-items:flex-start}}
 @media(max-width:760px){.registro{grid-template-columns:1fr}.diagrama{grid-template-columns:1fr;row-gap:8px}.diagrama>*{grid-column:1!important;grid-row:auto!important}.d-flecha,.d-baja{display:none}}
+
+/* Botón de salir: cierra la sesión en este navegador (borra la clave guardada) y vuelve a /login */
+.boton-salir{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid #dde5ec;border-radius:8px;background:#fff;color:#a44239;font:600 11px 'DM Sans',sans-serif;cursor:pointer}
+.boton-salir:hover{background:#fdecea;border-color:#f0c4be}.boton-salir span{font-size:14px}

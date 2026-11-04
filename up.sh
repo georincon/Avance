@@ -43,6 +43,7 @@ REDES=(
   nw-nginx_default             # srv-nw-nginx
   onboarding_default           # srv-onboarding
   registraduria_default        # eudi-srv-issuer-pid-registraduria
+  transito_default             # eudi-srv-issuer-pid-transito
   spartans_default             # eudi-srv-wallet-provider
   srv-tl-publisher_default      # srv-tl-publisher
 )
@@ -89,6 +90,21 @@ fi
 # El ecosistema. El compose raiz incluye cada stack con su propio fichero.
 echo ">> Levantando el ecosistema..."
 docker compose up -d "${BUILD[@]}" "${ARGUMENTOS_COMPOSE[@]}"
+
+# Keycloak de la Registraduria: los datos (realm, usuarios) viven en el volumen keycloak-reg-data y sobreviven.
+# Aun asi se reaplica, de forma idempotente, el login automatico de newwallet-app y se sincronizan los ciudadanos
+# de la tabla `cedulas` (datos + contrasena = cedula), por si el volumen se recreo o hay ciudadanos nuevos.
+if docker ps --format '{{.Names}}' | grep -qx keycloak-reg; then
+  echo ">> Esperando a Keycloak de la Registraduria..."
+  for _ in $(seq 1 60); do
+    [ "$(docker inspect -f '{{.State.Health.Status}}' keycloak-reg 2>/dev/null)" = "healthy" ] && break
+    sleep 5
+  done
+  eudi-srv-issuer-pid-registraduria/docker-compose/keycloak/apply-issuer-state-binding.sh \
+    || echo "   (no se pudo asignar el flujo de login automatico)"
+  python3 eudi-srv-issuer-pid-registraduria/docker-compose/keycloak/sincronizar-ciudadanos.py \
+    || echo "   (no se pudieron sincronizar los ciudadanos con Keycloak)"
+fi
 
 # El stack de la UIS, con su propio compose: no esta en el compose raiz.
 if [ "$CON_UIS" -eq 1 ]; then

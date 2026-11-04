@@ -27,6 +27,8 @@ class SecurityConfig {
                 auth
                     .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                     .requestMatchers("/api/**").permitAll()
+                    // Pagina estatica «Perdi mi celular» (se monta desde webroot/).
+                    .requestMatchers("/perdi-mi-celular.html").permitAll()
                     .anyRequest().authenticated()
             }
             .httpBasic { it.disable() }

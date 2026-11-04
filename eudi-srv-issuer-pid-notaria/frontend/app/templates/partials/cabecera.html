@@ -1,0 +1,15 @@
+<header class="notaria-cab" role="banner">
+  <div class="barra">
+    <a class="marca" href="{{ url_for('initial_page') }}">
+      <img src="{{ url_for('static', filename='notaria/logo.png') }}" alt="Notaría Avance">
+      <span><strong>Notaría Avance</strong><small>Emisión de documentos notariales a tu billetera digital</small></span>
+    </a>
+    {% if persona %}
+    <div class="yo"><span>{{ persona.nombre }} · CC {{ persona.documento }}</span><a href="{{ persona.salir }}">Salir</a></div>
+    {% endif %}
+    <nav>
+      <a href="{{ url_for('initial_page') }}">Inicio</a>
+      <a href="{{ url_for('frontend.credentialOffer') }}">Pedir un documento</a>
+    </nav>
+  </div>
+</header>

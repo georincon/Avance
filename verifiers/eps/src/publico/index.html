@@ -175,31 +175,31 @@ async function vistaMiEps() {
           ['Actualizada', h.actualizada ? `${fecha(h.actualizada)}${h.actualizada_por ? ` por ${h.actualizada_por}` : ''}` : 'Aún no tiene datos']]),
         el('button', { class: 'primario', onclick: () => entregar('historia') }, 'Recibir el resumen en mi wallet'))),
     el('h2', { style: 'margin-top:24px' }, 'Mis beneficiarios (opcional)'),
-    (a.beneficiarios ?? []).length ? el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Nombre'), el('th', {}, 'Documento'), el('th', {}, 'Parentesco'), el('th', {}, 'Desde'))),
-      el('tbody', {}, ...a.beneficiarios.map((b) => el('tr', {}, el('td', {}, b.nombre), el('td', {}, b.documento), el('td', {}, b.parentesco), el('td', {}, fecha(b.desde)))))) : el('p', { class: 'lead' }, 'Aún no tienes beneficiarios.'),
-    a.afiliacion.tipo !== 'Beneficiario' ? el('div', { style: 'margin-top:10px' },
+    (a.beneficiarios ?? []).length ? el('table', { class: 'tarjetas' }, el('thead', {}, el('tr', {}, el('th', {}, 'Nombre'), el('th', {}, 'Documento'), el('th', {}, 'Parentesco'), el('th', {}, 'Desde'))),
+      el('tbody', {}, ...a.beneficiarios.map((b) => el('tr', {}, el('td', { 'data-label': 'Nombre' }, b.nombre), el('td', { 'data-label': 'Documento' }, b.documento), el('td', { 'data-label': 'Parentesco' }, b.parentesco), el('td', { 'data-label': 'Desde' }, fecha(b.desde)))))) : el('p', { class: 'lead' }, 'Aún no tienes beneficiarios.'),
+    a.afiliacion.tipo !== 'Beneficiario' ? el('div', { class: 'acciones-pila' },
       el('button', { class: 'primario', disabled: f.estado !== 'Activo', onclick: async () => { const r = await pedir({ proposito: 'convivencia', titulo: 'Afiliar a mi compañero(a)', sub: 'Presenta tu declaración de convivencia de la notaría.' }); if (r) vistaMiEps() } }, 'Afiliar a mi compañero(a) con mi declaración de convivencia'),
-      el('button', { class: 'primario', style: 'margin-left:8px', disabled: f.estado !== 'Activo', onclick: async () => { const r = await pedir({ proposito: 'registro-civil', titulo: 'Afiliar a mi hijo(a)', sub: 'Presenta el registro civil de nacimiento de tu hijo o hija.' }); if (r) vistaMiEps() } }, 'Afiliar a mi hijo(a) con su registro civil'),
+      el('button', { class: 'primario', disabled: f.estado !== 'Activo', onclick: async () => { const r = await pedir({ proposito: 'registro-civil', titulo: 'Afiliar a mi hijo(a)', sub: 'Presenta el registro civil de nacimiento de tu hijo o hija.' }); if (r) vistaMiEps() } }, 'Afiliar a mi hijo(a) con su registro civil'),
       el('p', { style: 'color:var(--suave);font-size:.9rem' }, 'Pide la declaración de convivencia (vale 90 días) o el registro civil de tu hijo(a) en la notaría y recíbelo en tu wallet. La EPS comprueba que lo emitió una notaría de confianza y que te señala a ti.')) : '',
     el('h2', { style: 'margin-top:24px' }, 'Lo que has recibido en tu wallet'),
-    a.credenciales.length ? el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Documento'), el('th', {}, 'Recibido'), el('th', {}, 'Estado'), el('th', {}))),
+    a.credenciales.length ? el('table', { class: 'tarjetas' }, el('thead', {}, el('tr', {}, el('th', {}, 'Documento'), el('th', {}, 'Recibido'), el('th', {}, 'Estado'), el('th', {}))),
       el('tbody', {}, ...a.credenciales.map((e) => el('tr', {},
-        el('td', {}, e.tipo === 'carne' ? 'Carnet IPS Avance' : `Historia clínica (versión ${e.version})`), el('td', {}, fecha(e.fecha)),
-        el('td', {}, el('span', { class: `etiqueta ${e.estado}` }, e.estado === 'vigente' ? 'Vigente' : e.estado === 'reemplazada' ? 'Reemplazada' : 'Revocada')),
-        el('td', {}, e.estado === 'vigente' ? el('button', { class: 'peligro', onclick: async () => { await api(`/api/credenciales/${e.indice}/revocar`, { method: 'POST' }); vistaMiEps() } }, 'Revocar') : ''))))) :
+        el('td', { 'data-label': 'Documento' }, e.tipo === 'carne' ? 'Carnet IPS Avance' : `Historia clínica (versión ${e.version})`), el('td', { 'data-label': 'Recibido' }, fecha(e.fecha)),
+        el('td', { 'data-label': 'Estado' }, el('span', { class: `etiqueta ${e.estado}` }, e.estado === 'vigente' ? 'Vigente' : e.estado === 'reemplazada' ? 'Reemplazada' : 'Revocada')),
+        el('td', { class: 'celda-acciones' }, e.estado === 'vigente' ? el('div', { class: 'acciones-fila' }, el('button', { class: 'primario', title: 'Pide una copia nueva; al recibirla, la anterior deja de valer', onclick: () => entregar(e.tipo, true) }, 'Reexpedir'), el('button', { class: 'peligro', onclick: async () => { await api(`/api/credenciales/${e.indice}/revocar`, { method: 'POST' }); vistaMiEps() } }, 'Revocar')) : ''))))) :
       el('p', { class: 'lead' }, 'Todavía nada.'),
-    el('p', { style: 'color:var(--suave);font-size:.9rem;margin-top:12px' }, 'Cuando tu médico actualiza tu historia, la que tenías en la wallet queda reemplazada: pide la nueva. Si pierdes el teléfono, revoca lo que tenías.'))
+    el('p', { style: 'color:var(--suave);font-size:.9rem;margin-top:12px' }, 'Cuando tu médico actualiza tu historia, la que tenías en la wallet queda reemplazada: pide la nueva. Si pierdes el teléfono o cambias de celular, pulsa Reexpedir: recibes una copia nueva y la anterior deja de valer.'))
 }
 
-async function entregar(tipo) {
+async function entregar(tipo, reexpedir = false) {
   try {
-    const o = await api('/api/oferta', { method: 'POST', body: { tipo } })
+    const o = await api('/api/oferta', { method: 'POST', body: { tipo, reexpedir } })
     vista.replaceChildren(el('button', { class: 'volver', onclick: () => (location.hash = 'mi-eps') }, '← Volver a Mi EPS'),
       el('h1', {}, tipo === 'carne' ? 'Recibe tu carné' : 'Recibe tu historia clínica'),
       el('div', { class: 'caja entrega' },
         MOVIL ? el('a', { class: 'boton primario', href: o.enlace }, 'Recibir en mi wallet') : el('img', { src: o.qr, alt: 'Código QR con la oferta' }),
         el('div', {}, el('p', {}, MOVIL ? 'Toca el botón y, cuando tu wallet lo pida, escribe este PIN:' : 'Escanéalo con tu wallet y, cuando lo pida, escribe este PIN:'),
-          el('div', { class: 'pin' }, o.pin), el('p', {}, 'La oferta vale 15 minutos y sirve una vez.'))))
+          el('div', { class: 'pin' }, o.pin), el('p', {}, 'La oferta vale 15 minutos y sirve una vez.'), reexpedir ? el('p', { style: 'color:var(--suave)' }, 'Al recibirla, la copia anterior deja de valer.') : '')))
   } catch (e) { alertar(e.message) }
 }
 function alertar(m) { vista.prepend(el('div', { class: 'aviso error', style: 'margin-bottom:12px' }, m)) }

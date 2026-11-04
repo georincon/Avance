@@ -44,6 +44,7 @@ const FOTO = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/
 const MOVIMIENTOS = ['entrada', 'salida']
 
 const verifier = crearVerifier({ api: requerida('VERIFIER_API') })
+const sesiones = new Map()     // id de cookie → { id, pendiente? } (para que la wallet vuelva al mismo navegador)
 const solicitudes = new Map() // id → { transaccion, movimiento, creada, final?, decidida? }
 const registro = []           // { hora, movimiento, nombre, documento, pasaporte, decision } (más reciente primero)
 
@@ -52,8 +53,18 @@ setInterval(() => {
   for (const [id, s] of solicitudes) {
     if (ahora - (s.finalizada ?? s.creada) > CONSERVA_RESULTADO_MS) solicitudes.delete(id)
   }
+  for (const [id, s] of sesiones) if (!solicitudes.has(s.pendiente)) sesiones.delete(id)
   while (registro.length && ahora - registro[registro.length - 1].hora > CONSERVA_REGISTRO_MS) registro.pop()
 }, 60 * 1000).unref()
+
+function sesion(req, res) {
+  const id = /(?:^|;\s*)migracion_sesion=([\w-]+)/.exec(req.headers.cookie ?? '')?.[1]
+  if (id && sesiones.has(id)) return sesiones.get(id)
+  const nueva = randomBytes(24).toString('base64url')
+  sesiones.set(nueva, { id: nueva })
+  res.append('Set-Cookie', `migracion_sesion=${nueva}; Path=${BASE || '/'}; HttpOnly; Secure; SameSite=Lax`)
+  return sesiones.get(nueva)
+}
 
 const tokens = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().split(/\s+/).filter(Boolean).sort().join(' ')
 const parcial = (n) => (n ? `${String(n).slice(0, 2)}•••${String(n).slice(-2)}` : '')
@@ -84,9 +95,9 @@ function comprobaciones(pid, pas) {
   ]
 }
 
-async function consultar(solicitud) {
+async function consultar(solicitud, responseCode) {
   if (solicitud.final) return solicitud.final
-  const r = await verifier.resultado(solicitud.transaccion)
+  const r = await verifier.resultado(solicitud.transaccion, responseCode)
   if (r.estado === 'esperando') {
     if (Date.now() - solicitud.creada > VENCE_SOLICITUD_MS) return fin(solicitud, { estado: 'rechazada', motivo: 'El código venció. Genera uno nuevo.' })
     return r
@@ -126,10 +137,11 @@ const pagina = readFileSync(new URL('./publico/index.html', import.meta.url), 'u
 
 r.use('/publico', express.static(new URL('./publico', import.meta.url).pathname, { index: false }))
 r.get('/salud', (_req, res) => res.json({ estado: 'ok' }))
-r.get('/', (_req, res) => res.type('html').set('Cache-Control', 'no-store').send(pagina))
+r.get('/', (req, res) => { sesion(req, res); res.type('html').set('Cache-Control', 'no-store').send(pagina) })
 
 r.post('/api/solicitud', async (req, res) => {
-  const movimiento = req.body?.movimiento
+  const s = sesion(req, res)
+  const { movimiento, dispositivo } = req.body ?? {}
   if (!MOVIMIENTOS.includes(movimiento)) return res.status(400).json({ error: 'movimiento: entrada o salida' })
   try {
     const { transaccion, enlace } = await verifier.crearSolicitud({
@@ -138,9 +150,12 @@ r.post('/api/solicitud', async (req, res) => {
         { id: 'pasaporte', vct: VCT_PASAPORTE, datos: DATOS_PASAPORTE },
       ],
       nonce: randomBytes(16).toString('base64url'),
+      // En el mismo teléfono la wallet vuelve al portal al terminar.
+      redireccion: dispositivo === 'mismo' ? `${URL_PUBLICA}/volver` : undefined,
     })
     const id = randomBytes(16).toString('base64url')
-    solicitudes.set(id, { transaccion, movimiento, creada: Date.now() })
+    solicitudes.set(id, { transaccion, movimiento, sesion: s.id, creada: Date.now() })
+    s.pendiente = id
     res.json({ id, enlace, qr: await QRCode.toDataURL(enlace, { margin: 1, width: 360 }), vence_en: VENCE_SOLICITUD_MS / 1000 })
   } catch (e) {
     console.error(`[solicitud] ${e.message}`)
@@ -150,7 +165,7 @@ r.post('/api/solicitud', async (req, res) => {
 
 r.get('/api/solicitud/:id', async (req, res) => {
   const solicitud = solicitudes.get(req.params.id)
-  if (!solicitud) return res.status(404).json({ estado: 'rechazada', motivo: 'Solicitud desconocida.' })
+  if (!solicitud || solicitud.sesion !== sesion(req, res).id) return res.status(404).json({ estado: 'rechazada', motivo: 'Solicitud desconocida.' })
   if (solicitud.decidida) return res.json({ estado: 'rechazada', motivo: 'Este control ya se resolvió.' })
   try {
     res.json(await consultar(solicitud))
@@ -160,12 +175,36 @@ r.get('/api/solicitud/:id', async (req, res) => {
   }
 })
 
+// A donde vuelve la wallet en el mismo teléfono, con el código que libera el resultado. Se consulta con el código y se
+// devuelve a la página, que recupera la solicitud de esta sesión (/api/pendiente) y sigue como tras escanear el QR.
+r.get('/volver', async (req, res) => {
+  const solicitud = solicitudes.get(sesion(req, res).pendiente)
+  const fallo = (motivo) => res.redirect(`${BASE}/?error=${encodeURIComponent(motivo)}`)
+  if (!solicitud || !req.query.response_code) return fallo('No encontramos la solicitud. Inténtalo de nuevo desde este navegador.')
+  try {
+    const final = await consultar(solicitud, String(req.query.response_code))
+    if (final.estado === 'listo') return res.redirect(`${BASE}/?volver=1`)
+    return fallo(final.motivo ?? 'La wallet todavía no ha respondido.')
+  } catch (e) {
+    console.error(`[volver] ${e.message}`)
+    return fallo('El servicio de verificación no está disponible.')
+  }
+})
+
+// La solicitud en curso de esta sesión (para retomarla al volver la wallet; el resultado se pide después con /api/solicitud/:id).
+r.get('/api/pendiente', (req, res) => {
+  const id = sesion(req, res).pendiente
+  const sol = solicitudes.get(id)
+  if (!sol || !sol.final || sol.decidida) return res.json({})
+  res.set('Cache-Control', 'no-store').json({ id })
+})
+
 // El funcionario decide. Se anota en el registro de la jornada (sin retratos) y se borran los datos de la solicitud.
 r.post('/api/decision', (req, res) => {
   const { id, decision } = req.body ?? {}
   const solicitud = solicitudes.get(id)
   if (!['permitir', 'denegar'].includes(decision)) return res.status(400).json({ error: 'decision: permitir o denegar' })
-  if (solicitud?.final?.estado !== 'listo' || solicitud.decidida) return res.status(409).json({ error: 'No hay un control pendiente de decidir.' })
+  if (solicitud?.sesion !== sesion(req, res).id || solicitud.final?.estado !== 'listo' || solicitud.decidida) return res.status(409).json({ error: 'No hay un control pendiente de decidir.' })
   const f = solicitud.final
   if (decision === 'permitir' && !f.todoBien) return res.status(409).json({ error: 'Hay comprobaciones sin cumplir: no se puede permitir.' })
   const v = f.viajero

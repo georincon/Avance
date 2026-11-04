@@ -12,6 +12,12 @@ import java.util.UUID
 
 interface OnboardingSessionRepository : JpaRepository<OnboardingSession, UUID> {
     fun findFirstByDocumentNumber(documentNumber: String): OnboardingSession?
+
+    /** Sesion mas reciente de un documento, filtrada por estado (usada por «Perdi mi celular»). */
+    fun findFirstByDocumentNumberAndStatusOrderByCreatedAtDesc(
+        documentNumber: String,
+        status: com.onboarding.domain.OnboardingStatus,
+    ): OnboardingSession?
 }
 
 interface OtpChallengeRepository : JpaRepository<OtpChallenge, UUID> {

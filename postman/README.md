@@ -11,6 +11,7 @@ Cada proyecto es una carpeta, cada prueba trae su explicación, sus comprobacion
 | `PRUEBAS-CURL.md` | Las mismas pruebas con `curl`, por proyecto, paso a paso | sí |
 | `Avance-local.postman_environment.json` | Entorno con las claves ya puestas (importar y listo) | **no** |
 | `DATOS-LOCALES.md` | Claves, datos de conexión de las bases (Postgres y MySQL), datos de prueba y catálogo de credenciales | **no** |
+| `pruebasintegracion/` | API REST de órdenes de emisión para la plataforma de notarías (SIGNO QA): documento de consumo, modelo entidad-relación, colección de 24 pruebas y guía curl | sí (menos el entorno `-local`) |
 | `notaria/` | Colección propia de `verifiers/notaria` (31 pruebas: portal, trámites, verificación y emisor), con su entorno, guía y generador | sí |
 | `generar.py`, `marco.py`, `definiciones.py` | Generador: de aquí salen todos los archivos anteriores | sí |
 

@@ -14,3 +14,5 @@ V	290125211205Z		100C	unknown	/CN=Ministerio de Relaciones Exteriores de Cívica
 V	290125211638Z		100D	unknown	/CN=Universidad Industrial de Santander/O=Universidad Industrial de Santander/C=CO
 V	290128125116Z		100E	unknown	/CN=Migración Cívica/O=Migración Cívica/C=CO
 V	290128224142Z		100F	unknown	/CN=Cumbre Gym/O=Cumbre Gym/C=CO
+V	290201194736Z		1010	unknown	/CN=Dirección de Tránsito de Bucaramanga/O=Dirección de Tránsito de Bucaramanga/C=CO
+V	290206211958Z		1011	unknown	/CN=Universidad Industrial de Santander/O=Universidad Industrial de Santander/C=CO

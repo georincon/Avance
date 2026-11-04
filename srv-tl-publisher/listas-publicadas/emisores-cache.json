@@ -26,7 +26,7 @@
     "tipo": "urn:eudi:pid:1"
    }
   ],
-  "leido": "2026-10-26T22:41:43+00:00"
+  "leido": "2026-11-04T21:19:59+00:00"
  },
  "https://civica-desarrollo.avance.org.co/uis-issuer": {
   "configuraciones": [
@@ -103,7 +103,7 @@
     "tipo": "urn:co:uis:carnet-estudiantil:1"
    }
   ],
-  "leido": "2026-10-26T22:41:43+00:00"
+  "leido": "2026-11-04T21:20:00+00:00"
  },
  "https://civica-desarrollo.avance.org.co/eps": {
   "configuraciones": [
@@ -120,7 +120,7 @@
     "tipo": "urn:co:eps:resumen-historia-clinica:1"
    }
   ],
-  "leido": "2026-10-26T22:41:43+00:00"
+  "leido": "2026-11-04T21:19:59+00:00"
  },
  "https://civica-desarrollo.avance.org.co/notaria": {
   "configuraciones": [
@@ -179,7 +179,7 @@
     "tipo": "urn:co:notaria:permiso-salida-menor:1"
    }
   ],
-  "leido": "2026-10-26T22:41:43+00:00"
+  "leido": "2026-11-04T21:20:00+00:00"
  },
  "https://civica-desarrollo.avance.org.co/aerolinea": {
   "configuraciones": [
@@ -190,7 +190,7 @@
     "tipo": "urn:co:aerolinea:tiquete:1"
    }
   ],
-  "leido": "2026-10-26T22:41:43+00:00"
+  "leido": "2026-11-04T21:20:00+00:00"
  },
  "https://civica-desarrollo.avance.org.co/cancilleria": {
   "configuraciones": [
@@ -201,7 +201,7 @@
     "tipo": "urn:co:cancilleria:pasaporte:1"
    }
   ],
-  "leido": "2026-10-26T22:41:43+00:00"
+  "leido": "2026-11-04T21:20:00+00:00"
  },
  "https://civica-desarrollo.avance.org.co/universidad": {
   "configuraciones": [
@@ -223,6 +223,6 @@
     "tipo": "urn:co:gym:tarjeta-socio:1"
    }
   ],
-  "leido": "2026-10-26T22:41:43+00:00"
+  "leido": "2026-11-04T21:20:00+00:00"
  }
 }

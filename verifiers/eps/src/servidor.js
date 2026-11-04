@@ -287,7 +287,7 @@ r.post('/api/oferta', conPersona(async (req, res, p) => {
   if (!a) return res.status(404).json({ error: 'No estás afiliado.' })
   if (!DOCUMENTOS[tipo]) return res.status(400).json({ error: 'tipo: carne o historia' })
   if (tipo === 'carne' && a.afiliacion.estado !== 'Activo') return res.status(409).json({ error: `Tu afiliación está ${a.afiliacion.estado.toLowerCase()}.` })
-  const o = emisor.ofrecer(a.documento, tipo)
+  const o = emisor.ofrecer(a.documento, tipo, req.body?.reexpedir === true)
   res.json({ ...o, qr: await QRCode.toDataURL(o.enlace, { margin: 1, width: 320 }) })
 }))
 

@@ -48,6 +48,7 @@
   button { font: inherit; cursor: pointer; border: 0; border-radius: 999px; font-weight: 600; letter-spacing: .02em; }
   button:focus-visible { outline: 3px solid var(--azul); outline-offset: 3px; }
   .grande { padding: 16px 38px; font-size: 1.05rem; background: var(--azul); color: #fff; text-transform: uppercase; letter-spacing: .08em; font-size: .95rem; }
+  .solo-movil { display: none; text-decoration: none; }
   .grande:hover { background: var(--azul-osc); }
   .suave { padding: 10px 20px; background: transparent; color: var(--suave); border: 1px solid var(--linea); text-transform: uppercase; letter-spacing: .08em; font-size: .78rem; }
   .suave:hover { color: #fff; border-color: #fff; }
@@ -119,6 +120,7 @@
   const $ = (id) => document.getElementById(id)
   const puesto = $('puesto')
   let sondeo = null, cuenta = null
+  const MOVIL = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
   function el(tag, props = {}, ...hijos) {
     const e = document.createElement(tag)
@@ -155,7 +157,7 @@
   async function nuevo() {
     parar(); $('paso').textContent = 'Generando…'
     puesto.replaceChildren(el('p', { class: 'cuenta' }, 'Preparando el código…'))
-    const { ok, cuerpo } = await api('/api/solicitud', { method: 'POST' })
+    const { ok, cuerpo } = await api('/api/solicitud', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ dispositivo: MOVIL ? 'mismo' : 'otro' }) })
     if (!ok) return fallo(cuerpo.error ?? 'No se pudo crear la solicitud.')
     mostrarQr(cuerpo)
   }
@@ -164,8 +166,9 @@
     $('paso').textContent = 'Esperando a la wallet'
     const restante = el('div', { class: 'cuenta' })
     puesto.replaceChildren(
-      el('h3', {}, 'Escanea con tu wallet'),
-      el('img', { class: 'qr', src: s.qr, alt: 'Código QR para la wallet' }),
+      el('h3', {}, MOVIL ? 'Abre tu wallet' : 'Escanea con tu wallet'),
+      MOVIL ? el('a', { class: 'grande solo-movil', href: s.enlace, style: 'display:inline-block;text-decoration:none' }, 'Abrir mi wallet') : el('img', { class: 'qr', src: s.qr, alt: 'Código QR para la wallet' }),
+      MOVIL ? el('p', {}, 'Revisa y acepta en tu wallet. Volverás aquí automáticamente.') : null,
       restante,
       el('div', { class: 'pide' }, el('b', {}, 'Se pide: '), 'foto, nombres, apellidos y número de documento del documento de identidad digital. Solo se muestran al guardia.'),
       el('div', {}, el('button', { class: 'suave', onclick: () => { parar(); espera() } }, 'Cancelar')),
@@ -175,6 +178,7 @@
       const seg = Math.max(0, Math.round((limite - Date.now()) / 1000))
       restante.textContent = `El código vence en ${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`
     }, 1000)
+    if (MOVIL) return   // la wallet vuelve a /volver y la página retoma la solicitud al cargar
     sondeo = setInterval(async () => {
       const { cuerpo } = await api('/api/solicitud/' + s.id)
       if (cuerpo.estado === 'listo') { parar(); mostrarPersona(s.id, cuerpo.persona) }
@@ -232,7 +236,20 @@
       el('time', {}, hora(e.hora)))))
   }
 
-  espera(); cargarRegistro()
+  // Al volver la wallet (mismo teléfono) la página se recarga: se retoma la solicitud de esta sesión.
+  async function retomar() {
+    const q = new URLSearchParams(location.search)
+    const error = q.get('error'), volvio = q.get('volver')
+    if (error || volvio) history.replaceState(null, '', BASE + '/')
+    if (error) return fallo(error)
+    if (!volvio) return espera()
+    const { cuerpo: p } = await api('/api/pendiente')
+    if (!p.id) return fallo('No encontramos la solicitud. Inténtalo de nuevo desde este navegador.')
+    const { cuerpo } = await api('/api/solicitud/' + p.id)
+    if (cuerpo.estado === 'listo') mostrarPersona(p.id, cuerpo.persona)
+    else fallo(cuerpo.motivo ?? 'No se pudo verificar.')
+  }
+  espera(); cargarRegistro(); retomar()
 })()
 </script>
 </body>

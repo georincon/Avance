@@ -38,7 +38,7 @@ export function crearVerifier({ api }) {
    * `filtros` son datos con valor fijo ({ academic_level: 'MAESTRIA' }): la wallet solo ofrece las credenciales
    * que los cumplen. `datos` son los demás datos que se piden (se divulgan solo esos).
    */
-  async function crearSolicitud({ vct, filtros, datos, nonce }) {
+  async function crearSolicitud({ vct, filtros, datos, nonce, redireccion }) {
     const claims = [
       ...Object.entries(filtros).map(([dato, valor]) => ({ path: [dato], values: [valor] })),
       ...datos.map((dato) => ({ path: [dato] })),
@@ -51,6 +51,9 @@ export function crearVerifier({ api }) {
         profile: 'haip',
         intended_use_id: await intendedUse(),
         request_uri_method: 'get',
+        // Mismo dispositivo: al terminar la wallet vuelve a esta URL con ?response_code=…, y el resultado solo
+        // se entrega con ese código.
+        ...(redireccion ? { wallet_response_redirect_uri_template: `${redireccion}?response_code={RESPONSE_CODE}` } : {}),
       }),
     })
     if (estado !== 200) throw new Error(`el verifier no creó la solicitud (HTTP ${estado})`)
@@ -58,10 +61,12 @@ export function crearVerifier({ api }) {
   }
 
   /** { estado: 'esperando' } | { estado: 'listo', emisor, vct, datos } | { estado: 'error', motivo } */
-  async function resultado(transaccion) {
+  async function resultado(transaccion, responseCode) {
     const t = encodeURIComponent(transaccion)
-    const { estado, cuerpo } = await llamar(`/ui/presentations/${t}`)
+    const q = responseCode ? `?response_code=${encodeURIComponent(responseCode)}` : ''
+    const { estado, cuerpo } = await llamar(`/ui/presentations/${t}${q}`)
     if (estado === 404) return { estado: 'error', motivo: 'la solicitud ya no existe' }
+    if (estado === 400 && cuerpo.error === 'InvalidResponseCode') return { estado: 'error', motivo: 'código de respuesta inválido' }
     if (estado === 400) {
       const { cuerpo: ev } = await llamar(`/ui/presentations/${t}/events`)
       const fallo = (ev.events ?? []).find((e) => FALLOS[e.event])

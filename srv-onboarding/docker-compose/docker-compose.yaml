@@ -72,8 +72,15 @@ services:
       # SOLO desarrollo: la app completa el OTP sola con el codigo devuelto por la API.
       OTP_EXPOSE_CODE: ${OTP_EXPOSE_CODE:-true}
       OTP_HASH_PEPPER: ${OTP_HASH_PEPPER:-dev-pepper-change-me}
+      # «Perdi mi celular»: API interna de revocacion del emisor de la Registraduria (red avance-eudi).
+      # La clave es la de DESARROLLO del emisor; en cualquier otro entorno defínela en .env.
+      ONBOARDING_LOSTDEVICE_ISSUER_URL: ${ONBOARDING_LOSTDEVICE_ISSUER_URL:-http://pid-issuer:8080/pid-registraduria/internal/v1/credentials/revoke}
+      ONBOARDING_INTERNAL_API_KEY: ${ONBOARDING_INTERNAL_API_KEY:-onb-internal-dev-key-change-me}
+      ONBOARDING_LOSTDEVICE_ISSUER_APIKEY: ${REG_REVOCATION_API_KEY:-reg-dev-revocation-key-change-me}
     volumes:
       - onboarding_uploads:/data/uploads
+      # Paginas estaticas (perdi-mi-celular.html); el backend las sirve desde /webroot.
+      - ../webroot:/webroot:ro
     healthcheck:
       test:
         - CMD

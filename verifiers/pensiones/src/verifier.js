@@ -36,10 +36,12 @@ export function crearVerifier({ api }) {
   /**
    * Pide una o varias credenciales SD-JWT VC en una sola presentación (DCQL: sin `credential_sets`, todas son
    * obligatorias). Cada una es { id, vct, filtros, datos }:
+   * Con `redireccion` (mismo dispositivo) la wallet vuelve a esa URL con ?response_code=… al terminar y el
+   * resultado solo se entrega con ese código.
    *   `filtros` son datos con valor fijo ({ academic_level: 'PREGRADO' }): la wallet solo ofrece las credenciales
    *   que los cumplen. `datos` son los demás que se piden; un dato anidado va como array (['age_equal_or_over', '18']).
    */
-  async function crearSolicitud({ credenciales, nonce }) {
+  async function crearSolicitud({ credenciales, nonce, redireccion }) {
     const credentials = credenciales.map(({ id, vct, filtros = {}, datos = [] }) => ({
       id, format: 'dc+sd-jwt', meta: { vct_values: [vct] },
       claims: [
@@ -55,6 +57,7 @@ export function crearVerifier({ api }) {
         profile: 'haip',
         intended_use_id: await intendedUse(),
         request_uri_method: 'get',
+        ...(redireccion ? { wallet_response_redirect_uri_template: `${redireccion}?response_code={RESPONSE_CODE}` } : {}),
       }),
     })
     if (estado !== 200) throw new Error(`el verifier no creó la solicitud (HTTP ${estado})`)
@@ -62,10 +65,12 @@ export function crearVerifier({ api }) {
   }
 
   /** { estado: 'esperando' } | { estado: 'listo', credenciales: { <id>: { emisor, vct, datos } } } | { estado: 'error', motivo } */
-  async function resultado(transaccion) {
+  async function resultado(transaccion, responseCode) {
     const t = encodeURIComponent(transaccion)
-    const { estado, cuerpo } = await llamar(`/ui/presentations/${t}`)
+    const q = responseCode ? `?response_code=${encodeURIComponent(responseCode)}` : ''
+    const { estado, cuerpo } = await llamar(`/ui/presentations/${t}${q}`)
     if (estado === 404) return { estado: 'error', motivo: 'la solicitud ya no existe' }
+    if (estado === 400 && cuerpo.error === 'InvalidResponseCode') return { estado: 'error', motivo: 'código de respuesta inválido' }
     if (estado === 400) {
       const { cuerpo: ev } = await llamar(`/ui/presentations/${t}/events`)
       const fallo = (ev.events ?? []).find((e) => FALLOS[e.event])

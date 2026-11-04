@@ -116,6 +116,15 @@ export function crearSocios(archivo) {
 
     emisionesDe: (documento) => leer().emisiones.filter((e) => e.documento === documento).reverse(),
 
+    /** Reexpedición: las tarjetas vigentes quedan reemplazadas (el socio recibe una nueva y la anterior deja de valer). */
+    reexpedir(documento, tipo) {
+      const p = leer()
+      const n = p.emisiones.filter((e) => e.documento === documento && e.tipo === tipo && e.estado === 'vigente').length
+      retirar(p, documento, tipo)
+      guardar(p)
+      return n
+    },
+
     /** El socio retira una tarjeta suya (perdió el teléfono, ya no quiere que circule). */
     revocar(documento, indice) {
       const p = leer()

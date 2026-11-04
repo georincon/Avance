@@ -117,3 +117,12 @@ data class AuditEventResponse(
     val message: String?,
     val createdAt: Instant,
 )
+
+// ---- «Perdi mi celular» ----
+data class LostDeviceStartRequest(val documentNumber: String)
+
+data class LostDeviceStartResponse(val message: String, val devCode: String? = null)
+
+data class LostDeviceConfirmRequest(val documentNumber: String, val code: String)
+
+data class LostDeviceConfirmResponse(val revoked: Int, val message: String)

@@ -165,6 +165,9 @@
   let sondeo = null, cuenta = null
   const verificados = new Map()   // clave de nivel -> { nivel, id, formacion, identidad, hora } (solo en memoria)
   let tarjetas = []
+  // En el celular la wallet se abre con un enlace y vuelve a /volver (la página se recarga): lo verificado se
+  // recupera del servidor (/api/sesion), no de la memoria de esta pestaña.
+  const MOVIL = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
   let firmaDisponible = false
 
   function el(tag, props = {}, ...hijos) {
@@ -194,7 +197,7 @@
     if (!modal.open) modal.showModal()
     const { ok, cuerpo } = await api('/api/solicitud', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ nivel: nivel.clave, paso, previa }),
+      body: JSON.stringify({ nivel: nivel.clave, paso, previa, dispositivo: MOVIL ? 'mismo' : 'otro' }),
     })
     if (!ok) return mostrarError(cuerpo.error ?? 'No se pudo crear la solicitud.', nivel, paso, previa)
     mostrarQr(nivel, paso, previa, cuerpo)
@@ -206,10 +209,11 @@
     const restante = el('div', { class: 'cuenta' })
     contenido.replaceChildren(
       el('h2', { id: 'titulo' }, identidad ? `Confirmar identidad · ${nivel.nombre}` : `Verificar ${nivel.nombre}`),
-      el('p', { class: 'sub' }, identidad ? 'Segundo paso, opcional: la persona comparte quién es.' : 'Muestra este código a la persona candidata.'),
-      el('img', { class: 'qr', src: s.qr, alt: 'Código QR para escanear con la wallet' }),
+      el('p', { class: 'sub' }, identidad ? 'Segundo paso, opcional: la persona comparte quién es.' : (MOVIL ? 'Abre tu wallet para compartir tu credencial.' : 'Muestra este código a la persona candidata.')),
+      MOVIL ? el('a', { class: 'enlace boton', style: 'display:block;text-align:center;margin:12px 0', href: s.enlace }, 'Abrir mi wallet')
+        : el('img', { class: 'qr', src: s.qr, alt: 'Código QR para escanear con la wallet' }),
       restante,
-      el('ol', { class: 'pasos' }, el('li', {}, 'Abre tu wallet y escanea el código.'), el('li', {}, 'Revisa lo que se pide y acepta.'), el('li', {}, 'El resultado aparece aquí.')),
+      el('ol', { class: 'pasos' }, el('li', {}, MOVIL ? 'Toca «Abrir mi wallet».' : 'Abre tu wallet y escanea el código.'), el('li', {}, 'Revisa lo que se pide y acepta.'), el('li', {}, MOVIL ? 'Volverás a esta página con el resultado.' : 'El resultado aparece aquí.')),
       el('div', { class: 'pide' }, el('b', {}, 'Se pide: '), pide, el('br'), el('b', {}, 'Condición: '), `credencial de ${nivel.nombre} y graduado/a.`),
       el('div', { class: 'acciones' }, el('button', { class: 's', onclick: () => navigator.clipboard?.writeText(s.enlace) }, 'Copiar enlace'), el('button', { class: 's', onclick: cerrar }, 'Cancelar')),
     )
@@ -218,6 +222,7 @@
       const seg = Math.max(0, Math.round((limite - Date.now()) / 1000))
       restante.textContent = `El código vence en ${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`
     }, 1000)
+    if (MOVIL) return   // la wallet vuelve a /volver con el código de respuesta; no se sondea
     sondeo = setInterval(async () => {
       const { cuerpo } = await api('/api/solicitud/' + s.id)
       if (cuerpo.estado === 'listo') { parar(); registrar(nivel, s.id, paso, cuerpo) }
@@ -300,13 +305,13 @@
     const restante = el('div', { class: 'cuenta' })
     contenido.replaceChildren(
       el('h2', { id: 'titulo' }, 'Firmar el contrato'),
-      el('p', { class: 'sub' }, 'La persona escanea este código con su wallet para firmar el contrato.'),
-      el('img', { class: 'qr', src: s.qr, alt: 'Código QR para firmar con la wallet' }),
+      el('p', { class: 'sub' }, MOVIL ? 'Abre tu wallet para firmar el contrato.' : 'La persona escanea este código con su wallet para firmar el contrato.'),
+      MOVIL ? el('a', { class: 'enlace boton', style: 'display:block;text-align:center;margin:12px 0', href: s.enlace }, 'Abrir mi wallet') : el('img', { class: 'qr', src: s.qr, alt: 'Código QR para firmar con la wallet' }),
       restante,
       el('ol', { class: 'pasos' },
-        el('li', {}, 'En la wallet: Inicio → Firmar → Escanear QR.'),
+        el('li', {}, MOVIL ? 'Toca «Abrir mi wallet».' : 'En la wallet: Inicio → Firmar → Escanear QR.'),
         el('li', {}, 'Revisa el contrato y elige el servicio de firma.'),
-        el('li', {}, 'Autoriza la firma con tu PIN. El resultado aparece aquí.')),
+        el('li', {}, MOVIL ? 'Autoriza la firma con tu PIN y vuelve a este navegador: el resultado aparece aquí.' : 'Autoriza la firma con tu PIN. El resultado aparece aquí.')),
       el('div', { class: 'pide' }, el('b', {}, 'Documento: '), `${s.documento.etiqueta} (${Math.round(s.documento.bytes / 1024)} KB) · `, el('a', { class: 'enlace', href: s.documento.ver, target: '_blank', rel: 'noopener' }, 'ver el contrato'), el('br'),
         el('b', {}, 'Huella SHA-256: '), s.documento.sha256),
       el('p', { class: 'sub', style: 'font-size:.82rem' }, 'Firma electrónica de prueba del ecosistema de pruebas: sin validez legal.'),
@@ -317,12 +322,19 @@
       const seg = Math.max(0, Math.round((limite - Date.now()) / 1000))
       restante.textContent = `El código vence en ${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`
     }, 1000)
-    sondeo = setInterval(async () => {
+    let miSondeo = null
+    const consultar = async () => {
+      if (!sondeo || sondeo !== miSondeo) return
       const { cuerpo } = await api('/api/firma/' + s.id)
+      if (!sondeo || sondeo !== miSondeo) return
       if (cuerpo.estado === 'firmado') { parar(); contratoFirmado(nivel, cuerpo) }
       else if (cuerpo.estado === 'invalida') { parar(); mostrarFirmaInvalida(nivel, idIdentidad, cuerpo.verificacion) }
       else if (cuerpo.estado === 'rechazada') { parar(); mostrarError(cuerpo.motivo, nivel, 'contrato', idIdentidad) }
-    }, 2000)
+    }
+    sondeo = miSondeo = setInterval(consultar, 2000)
+    // En el mismo teléfono la wallet firma con el navegador en segundo plano (el sondeo se frena): al volver a esta
+    // pestaña se consulta de inmediato.
+    if (MOVIL) document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') consultar() })
   }
 
   const listaComprobaciones = (v) => el('ul', { class: 'comprobaciones' }, (v?.comprobaciones ?? []).map((c) =>
@@ -373,7 +385,27 @@
     })
     $('niveles').replaceChildren(...tarjetas.map((t) => t.boton))
     pintar()
+    return recuperar()
   })
+
+  // Al volver de la wallet (o al recargar) se reconstruye lo verificado de esta sesión y se muestra el error si lo hubo.
+  async function recuperar() {
+    const q = new URLSearchParams(location.search)
+    const error = q.get('error')
+    if (q.has('error') || q.has('volvio')) history.replaceState(null, '', BASE + '/')
+    const { ok, cuerpo } = await api('/api/sesion')
+    if (ok) for (const v of cuerpo.verificados ?? []) {
+      const nivel = tarjetas.find((t) => t.clave === v.nivel)
+      if (nivel) verificados.set(v.nivel, { ...v, nivel, hora: new Date(v.hora) })
+    }
+    pintar()
+    if (error) {
+      contenido.replaceChildren(
+        el('span', { class: 'sello mal' }, '✖ No verificado'), el('h2', { id: 'titulo' }, 'No se pudo verificar'), el('p', { class: 'sub' }, error),
+        el('div', { class: 'acciones' }, el('button', { class: 'p', onclick: cerrar }, 'Cerrar')))
+      modal.showModal()
+    }
+  }
 })()
 </script>
 </body>

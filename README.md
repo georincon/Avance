@@ -23,6 +23,7 @@ que cada uno conserva su fichero, sus variables y sus secretos:
 | Stack | Qué es | Ruta pública |
 |---|---|---|
 | `eudi-srv-issuer-pid-registraduria` | Emisor de la PID (cédula) | `/pid-registraduria`, `/idp-reg` |
+| `eudi-srv-issuer-pid-transito` | Emisor del mDL (licencia de conducción; no es PID) | `/pid-transito`, `/idp-tra` |
 | `eudi-srv-wallet-provider` | Wallet Provider (WUA, Key Attestations) | `/wallet-provider` |
 | `srv-onboarding` | Onboarding: documento, OCR, selfie, OTP, consentimiento | `/onboarding` |
 | `srv-tl-publisher` | Publicador de listas de confianza + su back-office | `/tl-publisher` |
@@ -62,6 +63,7 @@ documentación.
 | Proyecto | Rol ARF |
 |---|---|
 | `eudi-srv-issuer-pid-registraduria` | PID Provider |
+| `eudi-srv-issuer-pid-transito` | Attestation Provider (mDL, PuB-EAA) |
 | `eudi-srv-issuer-pid-uis` | Attestation Provider (PuB-EAA) |
 | `eudi-srv-wallet-provider` | Wallet Provider |
 | `eudi-srv-trust-validator` | Validador de confianza (LoTE/TSL) |

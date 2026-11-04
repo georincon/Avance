@@ -98,6 +98,7 @@
   .movs { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
   .movs .grande.salida { background: var(--rojo-osc); } .movs .grande.salida:hover { background: var(--rojo); }
   .mov-etiqueta { font-family: var(--mono); font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; color: var(--azul); }
+  .solo-movil { display: none; text-decoration: none; }
   .permitir:disabled { opacity: .35; cursor: not-allowed; }
   @media (max-width: 760px) { .carnet { grid-template-columns: 1fr; } .fotos { justify-content: center; } }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
@@ -195,6 +196,7 @@
   const $ = (id) => document.getElementById(id)
   const puesto = $('puesto')
   let sondeo = null, cuenta = null
+  const MOVIL = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
   function el(tag, props = {}, ...hijos) {
     const e = document.createElement(tag)
@@ -234,7 +236,7 @@
   async function nuevo(mov = movimiento) {
     parar(); movimiento = mov; $('paso').textContent = 'Generando…'
     puesto.replaceChildren(el('p', { class: 'cuenta' }, 'Preparando el código…'))
-    const { ok, cuerpo } = await api('/api/solicitud', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ movimiento }) })
+    const { ok, cuerpo } = await api('/api/solicitud', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ movimiento, dispositivo: MOVIL ? 'mismo' : 'otro' }) })
     if (!ok) return fallo(cuerpo.error ?? 'No se pudo crear la solicitud.')
     mostrarQr(cuerpo)
   }
@@ -244,8 +246,9 @@
     const restante = el('div', { class: 'cuenta' })
     puesto.replaceChildren(
       el('div', { class: 'mov-etiqueta' }, ETIQUETA[movimiento]),
-      el('h3', {}, 'Escanea con tu wallet'),
-      el('img', { class: 'qr', src: s.qr, alt: 'Código QR para la wallet' }),
+      el('h3', {}, MOVIL ? 'Abre tu wallet' : 'Escanea con tu wallet'),
+      MOVIL ? el('a', { class: 'grande solo-movil', href: s.enlace, style: 'display:inline-block;text-decoration:none' }, 'Abrir mi wallet') : el('img', { class: 'qr', src: s.qr, alt: 'Código QR para la wallet' }),
+      MOVIL ? el('p', {}, 'Revisa y acepta en tu wallet. Volverás aquí automáticamente.') : null,
       restante,
       el('div', { class: 'pide' }, el('b', {}, 'Se pide: '), 'del documento de identidad digital, nombres, apellidos y número de documento; del pasaporte, número, nombres, apellidos, documento, nacimiento, sexo, retrato y vencimiento. Solo se muestran al funcionario.'),
       el('div', {}, el('button', { class: 'suave', onclick: () => { parar(); espera() } }, 'Cancelar')),
@@ -255,6 +258,7 @@
       const seg = Math.max(0, Math.round((limite - Date.now()) / 1000))
       restante.textContent = `El código vence en ${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`
     }, 1000)
+    if (MOVIL) return   // la wallet vuelve a /volver y la página retoma la solicitud al cargar
     sondeo = setInterval(async () => {
       const { cuerpo } = await api('/api/solicitud/' + s.id)
       if (cuerpo.estado === 'listo') { parar(); mostrarViajero(s.id, cuerpo) }
@@ -325,7 +329,20 @@
       el('time', {}, hora(e.hora)))))
   }
 
-  espera(); cargarRegistro()
+  // Al volver la wallet (mismo teléfono) la página se recarga: se retoma la solicitud de esta sesión.
+  async function retomar() {
+    const q = new URLSearchParams(location.search)
+    const error = q.get('error'), volvio = q.get('volver')
+    if (error || volvio) history.replaceState(null, '', BASE + '/')
+    if (error) return fallo(error)
+    if (!volvio) return espera()
+    const { cuerpo: p } = await api('/api/pendiente')
+    if (!p.id) return fallo('No encontramos la solicitud. Inténtalo de nuevo desde este navegador.')
+    const { cuerpo } = await api('/api/solicitud/' + p.id)
+    if (cuerpo.estado === 'listo') mostrarViajero(p.id, cuerpo)
+    else fallo(cuerpo.motivo ?? 'No se pudo verificar.')
+  }
+  espera(); cargarRegistro(); retomar()
 })()
 </script>
 </body>

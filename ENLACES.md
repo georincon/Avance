@@ -17,7 +17,10 @@ los puertos `80` y `443` y reparte por prefijo de ruta. Ningún otro servicio pu
 | Dónde | Usuario | Contraseña |
 |---|---|---|
 | Panel admin de la Registraduría | `admin` | `RegAdmin-2026` |
+| Panel de estudiantes de la UIS (`/uis-issuer/uis/admin/estudiantes`) | `admin` | `UisAdmin-2026` |
 | Keycloak de la Registraduría (`/idp-reg/admin`) | `admin` | `password` |
+| Panel admin de Tránsito | `admin` | `TraAdmin-2026` |
+| Keycloak de Tránsito (`/idp-tra/admin`) | `admin` | `password` |
 | Keycloak de la UIS (`/idp-uis/admin`) | `admin` | `password` |
 | API del panel de control | — | `CONTROL_PANEL_TOKEN` → `panel-control/docker-compose/.env` |
 | API de publicación del publicador | — | `TL_PUBLISHER_API_KEY` → `srv-tl-publisher/docker-compose/.env` |
@@ -53,7 +56,7 @@ curl -sk https://civica-desarrollo.avance.org.co/api/projects \
 ```
 
 Acciones: `POST /api/projects/{id}/action` con `{"action":"up|down|restart"}`.
-Ids: `issuer-registraduria`, `issuer-uis`, `wallet-provider`, `onboarding`, `verifier`,
+Ids: `issuer-registraduria`, `issuer-transito`, `issuer-uis`, `wallet-provider`, `onboarding`, `verifier`,
 `trust-validator`, `tl-publisher`, `proxy-nginx`.
 
 ## 3. `srv-tl-publisher` — publicador de listas de confianza
@@ -128,7 +131,7 @@ Sin login. Acepta los tres paquetes Android registrados:
 
 | Código | Enlace | Qué es |
 |---|---|---|
-| 200 | `/pid-registraduria/registraduria/solicitar` | **Pantalla ciudadana**: pide la PID digital, sin login |
+| 200 | `/pid-registraduria/registraduria/solicitar` | **Pantalla para wallets de terceros**: autoservicio; cédula + nombres, apellidos y fecha de nacimiento (se homologan con la Registraduría) + selfie (se compara con la foto de referencia) |
 | 200 | `/pid-registraduria/registraduria/admin/login` | **Login del panel admin** (formulario) |
 | 302 | `/pid-registraduria/registraduria/admin/ciudadanos` | Listado de ciudadanos (redirige al login) |
 | 302 | `/pid-registraduria/registraduria/admin/ciudadanos/nuevo` | Alta manual de ciudadano (redirige al login) |
@@ -178,9 +181,22 @@ Los enlaces `/verifier/*` ya no existen. Los verifiers activos están en `/verif
 | 200 | `/onboarding/actuator/health` | Estado del backend |
 | 201 | `POST /onboarding/api/v1/onboarding/sessions` | Crear sesión de onboarding |
 | 405 | `GET /onboarding/api/v1/onboarding/sessions` | Es un `POST`: con `GET` responde `405` (correcto) |
+| 200 | `/onboarding/perdi-mi-celular.html` | «Perdí mi celular»: documento → código al contacto verificado → revoca las credenciales y la wallet (OTP simulado en pruebas) |
+| 202 | `POST /onboarding/api/v1/lost-device/start` · `/confirm` | La misma función por API: `start` siempre responde igual exista o no la cédula |
 | 200 | `/biometrics/health` | Servicio de biometría / OCR |
 
 Sin login.
+
+## 6b. `eudi-srv-issuer-pid-transito` — issuer del mDL (licencia de conducción)
+
+Verificados el 2026-10-30 (todos 200).
+
+| Código | Enlace | Qué es |
+|---|---|---|
+| 200 | `/pid-transito/transito/solicitar` | Pantalla ciudadana: pide el mDL, sin login |
+| 200 | `/pid-transito/transito/admin/login` | Login del panel admin de licencias |
+| 200 | `/pid-transito/.well-known/openid-credential-issuer` | Metadata OID4VCI (`org.iso.18013.5.1.mDL`) |
+| 200 | `/idp-tra/realms/pid-transito-realm/` | Realm de Keycloak de Tránsito |
 
 ## 10. Keycloak — dos instancias
 

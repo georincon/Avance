@@ -12,6 +12,7 @@ Fecha: 2026-10-20 · Dominio: `civica-desarrollo.avance.org.co` · Proxy públic
 |---|---|---|---|---|---|
 | Wallet Provider | `eudi-srv-wallet-provider` | `spartans-wallet-provider` | `/wallet-provider` | `Spartans Wallet Provider Root CA` (TL/WP) | ✅ operativo |
 | PID Provider | `eudi-srv-issuer-pid-registraduria` | `pid-issuer-reg` | `/pid-registraduria` | `REGISTRADURIA ISSUANCE ROOT` (TL/PID) | ✅ operativo |
+| Attestation Provider (Tránsito, mDL) | `eudi-srv-issuer-pid-transito` | `transito-issuer` | `/pid-transito` | `TRANSITO ISSUANCE ROOT` (PUB_EAA_Provider; pendiente de registrar en la TL) | ✅ operativo (sin probar con wallet) |
 | Attestation Provider (UIS) | `eudi-srv-issuer-pid-uis` | `uis-issuer` | `/uis-issuer` | `UIS Issuer Root CA` (TL/PUBEAA) | ✅ operativo |
 | Wallet Unit | `app-new-wallet` | app Android `co.org.newwallet.app.dev` | — | — | ⚠️ compilar con el dominio |
 | Wallet Unit | `app-avance-wallet` | app Android `co.org.avance.wallet.dev` | — | — | ⚠️ compilar con el dominio |
@@ -64,6 +65,7 @@ Todos los proyectos siguen la misma convención: el compose vive en
 | `srv-onboarding` | Postgres + biometría + API de onboarding | — | `avance-eudi` |
 | `eudi-srv-wallet-provider` | Postgres + status-list + provider | — | `avance-eudi` |
 | `eudi-srv-issuer-pid-registraduria` | Postgres + Keycloak + status-list + issuer + haproxy | — | `avance-eudi` |
+| `eudi-srv-issuer-pid-transito` | Postgres (`127.0.0.1:5437`) + Keycloak + status-list + issuer mDL + haproxy | — | `avance-eudi` |
 | `eudi-srv-issuer-pid-uis` | 2 Postgres + Keycloak (`/idp-uis`) + status-list + issuer + haproxy | — | `avance-eudi` |
 | `eudi-srv-trust-validator` | Validador de confianza (LoTL + almacén de anclas) | — | `avance-eudi` |
 | `srv-tl-publisher` | MySQL + publicador de listas + servicio de PKI (AIA/CRLDP) | — | `avance-eudi` |
@@ -85,6 +87,9 @@ Todos los proyectos siguen la misma convención: el compose vive en
 | `/pid-registraduria/*` | `haproxy-reg:80` (prefijo intacto) |
 | `/idp-reg/*` | `haproxy-reg:80` (Keycloak de la Registraduría) |
 | `/.well-known/(openid-credential-issuer\|oauth-protected-resource\|jwt-vc-issuer\|jwt-issuer\|oauth-authorization-server\|openid-configuration)/*` | según el sufijo: `haproxy-reg:80` o `haproxy-uis:80` |
+| `/pid-transito/*` | `haproxy-tra:80` (prefijo intacto) |
+| `/idp-tra/*` | `haproxy-tra:80` (Keycloak de Tránsito) |
+| `/status-list/pid-transito/*` | `status-list-tra:5000` (se quita el prefijo) |
 | `/uis-issuer/*` | `haproxy-uis:80` (prefijo intacto) |
 | `/idp-uis/*` | `haproxy-uis:80` (Keycloak de la UIS) |
 | `/status-list/wallet-provider/*` | `status-list-spartans:5000` (se quita el prefijo) |

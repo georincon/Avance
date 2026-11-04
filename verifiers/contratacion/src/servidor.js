@@ -84,7 +84,19 @@ async function pedirSello(consulta) {
 }
 
 const verifier = crearVerifier({ api: requerida('VERIFIER_API') })
-const solicitudes = new Map() // id → { paso, nivel, transaccion, creada, final?, previa? }
+const solicitudes = new Map() // id → { paso, nivel, transaccion, sesion, creada, final?, previa? }
+const sesiones = new Map() // id → { id, pendiente?, vista } (cookie contratacion_sesion; en memoria)
+
+// La sesión liga cada solicitud y su resultado al navegador que la creó. Es lo que permite que, en el mismo
+// teléfono, la wallet abra otra app y al volver /volver y la página recuperen lo verificado.
+function sesion(req, res) {
+  const id = /(?:^|;\s*)contratacion_sesion=([\w-]+)/.exec(req.headers.cookie ?? '')?.[1]
+  if (id && sesiones.has(id)) { sesiones.get(id).vista = Date.now(); return sesiones.get(id) }
+  const nueva = randomBytes(24).toString('base64url')
+  sesiones.set(nueva, { id: nueva, vista: Date.now() })
+  res.append('Set-Cookie', `contratacion_sesion=${nueva}; Path=${BASE || '/'}; HttpOnly; ${URL_PUBLICA.startsWith('https') ? 'Secure; ' : ''}SameSite=Lax`)
+  return sesiones.get(nueva)
+}
 const firmas = new Map() // id → { pdf, etiqueta, state, nonce, creada, estado, resultado?, firmado? }
 
 setInterval(() => {
@@ -95,6 +107,7 @@ setInterval(() => {
   for (const [id, f] of firmas) {
     if (ahora - (f.terminada ?? f.creada) > CONSERVA_RESULTADO_MS) firmas.delete(id)
   }
+  for (const [id, x] of sesiones) if (ahora - x.vista > 60 * 60 * 1000) sesiones.delete(id)
 }, 60 * 1000).unref()
 
 // --- Qué se acepta -------------------------------------------------------------------------------
@@ -127,9 +140,9 @@ const identidad = ({ datos }) => ({
   documento: datos.document_number,
 })
 
-async function consultar(solicitud) {
+async function consultar(solicitud, responseCode) {
   if (solicitud.final) return solicitud.final
-  const r = await verifier.resultado(solicitud.transaccion)
+  const r = await verifier.resultado(solicitud.transaccion, responseCode)
   if (r.estado === 'esperando') {
     if (Date.now() - solicitud.creada > VENCE_SOLICITUD_MS) {
       return fin(solicitud, { estado: 'rechazada', motivo: 'La solicitud venció. Genera un código nuevo.' })
@@ -177,13 +190,14 @@ r.get('/api/niveles', (_req, res) => res.json({
 // Crea la solicitud de un nivel (paso 'formacion') o la confirmación de identidad (paso 'identidad', que
 // continúa una formación ya verificada).
 r.post('/api/solicitud', async (req, res) => {
-  const { nivel, paso = 'formacion', previa } = req.body ?? {}
+  const s = sesion(req, res)
+  const { nivel, paso = 'formacion', previa, dispositivo } = req.body ?? {}
   if (!PEDIDOS[paso]) return res.status(400).json({ error: 'paso: formacion o identidad' })
   if (!nivelDe(nivel)) return res.status(400).json({ error: 'nivel no disponible' })
   let anterior
   if (paso === 'identidad') {
     anterior = solicitudes.get(previa)
-    if (anterior?.final?.estado !== 'listo' || anterior.nivel !== nivel) {
+    if (anterior?.sesion !== s.id || anterior.final?.estado !== 'listo' || anterior.nivel !== nivel) {
       return res.status(400).json({ error: 'primero hay que verificar la formación de ese nivel' })
     }
   }
@@ -193,9 +207,11 @@ r.post('/api/solicitud', async (req, res) => {
       filtros: { academic_level: nivel, academic_status: ESTADO_EXIGIDO },
       datos: PEDIDOS[paso],
       nonce: randomBytes(16).toString('base64url'),
+      redireccion: dispositivo === 'mismo' ? `${URL_PUBLICA}/volver` : undefined,
     })
     const id = randomBytes(16).toString('base64url')
-    solicitudes.set(id, { paso, nivel, transaccion, creada: Date.now(), previa: anterior?.resultado ? { formacion: anterior.resultado.formacion } : undefined })
+    solicitudes.set(id, { paso, nivel, transaccion, sesion: s.id, creada: Date.now(), previa: anterior?.resultado ? { formacion: anterior.resultado.formacion } : undefined })
+    if (dispositivo === 'mismo') s.pendiente = id
     res.json({ id, enlace, qr: await QRCode.toDataURL(enlace, { margin: 1, width: 360 }), vence_en: VENCE_SOLICITUD_MS / 1000 })
   } catch (e) {
     console.error(`[${paso}] ${e.message}`)
@@ -205,13 +221,50 @@ r.post('/api/solicitud', async (req, res) => {
 
 r.get('/api/solicitud/:id', async (req, res) => {
   const solicitud = solicitudes.get(req.params.id)
-  if (!solicitud) return res.status(404).json({ estado: 'rechazada', motivo: 'Solicitud desconocida.' })
+  if (!solicitud || solicitud.sesion !== sesion(req, res).id) return res.status(404).json({ estado: 'rechazada', motivo: 'Solicitud desconocida.' })
   try {
     res.json(await consultar(solicitud))
   } catch (e) {
     console.error(`[${solicitud.paso}] ${e.message}`)
     res.json({ estado: 'esperando' })
   }
+})
+
+// La wallet (mismo teléfono) vuelve aquí con ?response_code=… al terminar. Solo se entrega el resultado a la
+// sesión que creó la solicitud pendiente y con el código correcto; luego se deja a la persona en la página
+// principal, que recupera lo verificado con /api/sesion.
+r.get('/volver', async (req, res) => {
+  const s = sesion(req, res)
+  const solicitud = solicitudes.get(s.pendiente)
+  const fallo = (motivo) => res.redirect(`${BASE}/?error=${encodeURIComponent(motivo)}`)
+  if (!solicitud || solicitud.sesion !== s.id || !req.query.response_code) return fallo('No encontramos la solicitud. Inténtalo de nuevo desde este navegador.')
+  try {
+    const final = await consultar(solicitud, String(req.query.response_code))
+    delete s.pendiente
+    if (final.estado === 'listo') return res.redirect(`${BASE}/?volvio=1`)
+    return fallo(final.motivo ?? 'La wallet todavía no ha respondido.')
+  } catch (e) {
+    console.error(`[volver] ${e.message}`)
+    return fallo('El servicio de verificación no está disponible.')
+  }
+})
+
+// Lo ya verificado en esta sesión, para reconstruir la pantalla tras volver de la wallet.
+r.get('/api/sesion', (req, res) => {
+  const s = sesion(req, res)
+  const porNivel = new Map()
+  for (const [id, x] of solicitudes) {
+    if (x.sesion !== s.id || x.final?.estado !== 'listo') continue
+    const v = porNivel.get(x.nivel) ?? { nivel: x.nivel, hora: x.finalizada }
+    if (x.paso === 'formacion') { v.id = id; v.formacion = x.final.formacion; v.hora = x.finalizada }
+    else { v.idIdentidad = id; v.identidad = x.final.identidad; v.formacion ??= x.final.formacion }
+    porNivel.set(x.nivel, v)
+  }
+  for (const f of firmas.values()) {
+    const v = f.sesion === s.id && f.estado === 'firmado' && porNivel.get(f.nivel)
+    if (v) v.contrato = { cargo: f.cargo, verificacion: f.verificacion, descargar: `${BASE}/firma/firmado/${f.id}.pdf` }
+  }
+  res.set('Cache-Control', 'no-store').json({ verificados: [...porNivel.values()].filter((v) => v.id) })
 })
 
 // --- Contrato y firma ----------------------------------------------------------------------------
@@ -222,7 +275,7 @@ r.post('/api/contrato', async (req, res) => {
   if (!acceso) return res.status(503).json({ error: 'La firma de contratos no está disponible en este portal.' })
   const { previa, cargo } = req.body ?? {}
   const anterior = solicitudes.get(previa)
-  const resultado = anterior?.final
+  const resultado = anterior?.sesion === sesion(req, res).id ? anterior.final : undefined
   if (resultado?.estado !== 'listo' || !resultado.identidad || !resultado.formacion) {
     return res.status(400).json({ error: 'Primero hay que verificar la formación y confirmar la identidad.' })
   }
@@ -239,7 +292,7 @@ r.post('/api/contrato', async (req, res) => {
   const etiqueta = 'contrato-de-trabajo.pdf'
   const state = randomBytes(12).toString('base64url')
   const nonce = randomBytes(16).toString('base64url')
-  firmas.set(id, { pdf, etiqueta, state, nonce, creada: Date.now(), estado: 'esperando', persona: `${i.nombres} ${i.apellidos}`, cargo: puesto })
+  firmas.set(id, { id, sesion: anterior.sesion, nivel: anterior.nivel, pdf, etiqueta, state, nonce, creada: Date.now(), estado: 'esperando', persona: `${i.nombres} ${i.apellidos}`, cargo: puesto })
   const enlace = enlaceFirma({ acceso, urlPublica: URL_PUBLICA, id })
   console.log('[contrato] solicitud de firma creada')
   res.json({

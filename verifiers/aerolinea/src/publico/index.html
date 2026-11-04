@@ -200,6 +200,12 @@
   const fechaLarga = (f) => new Date(`${f}T12:00:00Z`).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
   const duracion = (min) => `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')} min`
   const svg = (s) => { const t = document.createElement('template'); t.innerHTML = s.trim(); return t.content.firstChild }
+  const MOVIL = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  // En el mismo teléfono la wallet abre otra app y la página se recarga al volver: lo que el paso necesita para continuar se guarda aquí.
+  const RETOMAR = 'aerolinea_retomar'
+  const guardarRetomar = (d) => { try { sessionStorage.setItem(RETOMAR, JSON.stringify(d)) } catch {} }
+  const leerRetomar = () => { try { return JSON.parse(sessionStorage.getItem(RETOMAR) ?? 'null') } catch { return null } }
+  const borrarRetomar = () => { try { sessionStorage.removeItem(RETOMAR) } catch {} }
   const parar = () => { clearInterval(sondeo); clearInterval(cuenta); sondeo = cuenta = null }
   modal.addEventListener('close', parar)
   const cerrar = () => { parar(); if (modal.open) modal.close() }
@@ -217,33 +223,37 @@
   }
 
   // Abre la ventana con el QR de una solicitud al verifier y llama a `listo` con el resultado cuando la wallet responde.
-  async function pedirALaWallet({ proposito, titulo, sub, pide, demo, previa, listo }) {
+  async function pedirALaWallet({ proposito, titulo, sub, pide, demo, previa, retomar, listo }) {
     parar()
     m.replaceChildren(el('div', { class: 'cargando' }, 'Preparando el código…'))
     if (!modal.open) modal.showModal()
-    const { ok, cuerpo } = await api('/api/solicitud', { method: 'POST', body: { proposito, demo, previa } })
+    const { ok, cuerpo } = await api('/api/solicitud', { method: 'POST', body: { proposito, demo, previa, dispositivo: MOVIL ? 'mismo' : 'otro' } })
     if (!ok) { m.replaceChildren(el('h2', {}, 'No se pudo'), el('div', { class: 'aviso error' }, cuerpo.error ?? 'Error'), el('div', { class: 'acciones' }, el('button', { class: 'claro', onclick: cerrar }, 'Cerrar'))); return }
     const restante = el('div', { class: 'cuenta' })
+    if (MOVIL) guardarRetomar({ id: cuerpo.id, proposito, previa, vista: vistaActual, busqueda, ...retomar })
     m.replaceChildren(
-      el('h2', { id: 'm-titulo' }, titulo), el('p', { class: 'sub', style: 'margin:0 0 8px' }, sub),
-      el('img', { class: 'qr', src: cuerpo.qr, alt: 'Código QR para la wallet' }), restante,
+      el('h2', { id: 'm-titulo' }, titulo), el('p', { class: 'sub', style: 'margin:0 0 8px' }, MOVIL ? 'Abre tu wallet, revisa y acepta. Volverás aquí automáticamente.' : sub),
+      MOVIL ? el('a', { class: 'rojo', href: cuerpo.enlace, style: 'display:block;text-align:center;text-decoration:none;border-radius:8px;font-weight:700;margin:12px 0' }, 'Abrir mi wallet')
+        : el('img', { class: 'qr', src: cuerpo.qr, alt: 'Código QR para la wallet' }), restante,
       el('div', { class: 'pide' }, el('b', {}, 'Se pide: '), pide),
       el('div', { class: 'acciones' }, el('button', { class: 'claro', onclick: () => navigator.clipboard?.writeText(cuerpo.enlace) }, 'Copiar enlace'), el('button', { class: 'claro', onclick: cerrar }, 'Cancelar')))
     const limite = Date.now() + cuerpo.vence_en * 1000
     cuenta = setInterval(() => { const s = Math.max(0, Math.round((limite - Date.now()) / 1000)); restante.textContent = `El código vence en ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }, 1000)
+    if (MOVIL) return // la wallet vuelve a /volver; no hace falta sondear
     sondeo = setInterval(async () => {
       const { cuerpo: r } = await api('/api/solicitud/' + cuerpo.id)
       if (r.estado === 'listo') { parar(); modal.close(); await listo(r, cuerpo.id) }
       else if (r.estado === 'rechazada') {
         parar()
-        m.replaceChildren(el('h2', {}, 'No se pudo verificar'), el('div', { class: 'aviso error' }, r.motivo), el('div', { class: 'acciones' }, el('button', { class: 'rojo', onclick: () => pedirALaWallet({ proposito, titulo, sub, pide, demo, previa, listo }) }, 'Generar un código nuevo'), el('button', { class: 'claro', onclick: cerrar }, 'Cerrar')))
+        m.replaceChildren(el('h2', {}, 'No se pudo verificar'), el('div', { class: 'aviso error' }, r.motivo), el('div', { class: 'acciones' }, el('button', { class: 'rojo', onclick: () => pedirALaWallet({ proposito, titulo, sub, pide, demo, previa, retomar, listo }) }, 'Generar un código nuevo'), el('button', { class: 'claro', onclick: cerrar }, 'Cerrar')))
       }
     }, 2000)
   }
 
   const PIDE_PASAJERO = 'tu nombre y apellidos, número de documento, fecha de nacimiento y foto, del documento de identidad digital (PID).'
-  function identificarse(despues) {
+  function identificarse(despues, retomar) {
     pedirALaWallet({
+      retomar: { identificar: true, ...retomar },
       proposito: 'identificacion', titulo: 'Identifícate con tu wallet', sub: 'La aerolínea necesita saber quién viaja: el tiquete es nominal.', pide: PIDE_PASAJERO,
       listo: async () => { await cargarPersona(); if (despues) despues(); else ir(vistaActual) },
     })
@@ -323,7 +333,7 @@
   }
 
   function elegir(v, tarifa) {
-    if (!persona) return identificarse(() => elegir(v, tarifa))
+    if (!persona) return identificarse(() => elegir(v, tarifa), { elegir: { v, tarifa } })
     vistaCompra(v, tarifa)
   }
 
@@ -494,7 +504,7 @@
       el('p', { style: 'margin:0 0 12px;color:var(--suave)' }, 'En el mostrador, la persona se identifica y presenta su tiquete y los de los menores a su cargo, todos en un solo código. Se comprueba que cada tiquete es de esta aerolínea, está vigente y es de quien lo presenta. Los que cumplen abordan y quedan usados. Un menor en un vuelo internacional necesita además su permiso de salida del país.'),
       el('label', { style: 'flex-direction:row;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:.9rem;color:var(--tinta);margin-bottom:14px' }, demo, 'Modo demostración: no exigir que el vuelo sea hoy'),
       el('button', { class: 'rojo', onclick: () => pedirALaWallet({
-        proposito: 'embarque', demo: demo.checked, titulo: 'Embarque: presenta tu tiquete', sub: 'Escanea con tu wallet y elige todos los tiquetes que embarcan contigo.',
+        proposito: 'embarque', demo: demo.checked, retomar: {}, titulo: 'Embarque: presenta tu tiquete', sub: 'Escanea con tu wallet y elige todos los tiquetes que embarcan contigo.',
         pide: 'tus tiquetes (reserva, vuelo, origen, destino, fecha, quién viaja y su responsable) y, del documento de identidad, tu nombre, documento y foto.',
         listo: (r, id) => resultadoEmbarque(r.embarque, id),
       }) }, 'Verificar tiquetes y documento'))
@@ -527,7 +537,7 @@
   }
 
   const pedirPermiso = (e, id) => pedirALaWallet({
-    proposito: 'permiso', previa: id, titulo: 'Permiso de salida del país', sub: 'Escanea con la wallet del adulto responsable y elige el permiso de cada menor.',
+    proposito: 'permiso', previa: id, retomar: {}, titulo: 'Permiso de salida del país', sub: 'Escanea con la wallet del adulto responsable y elige el permiso de cada menor.',
     pide: 'el permiso de salida de menor que otorgó una notaría: quién lo otorgó, el menor, el destino y las fechas del viaje.',
     listo: (r) => resultadoEmbarque(e, id, r.permiso).then(cargarManifiestos),
   })
@@ -576,7 +586,33 @@
     ciudades = cuerpo.ciudades; hoy = cuerpo.hoy
     await cargarPersona()
     ir('reservar')
+    await volverDeLaWallet()
   })()
+
+  // Al volver de la wallet (mismo teléfono): ?error=… si algo falló, o ?vuelta=<id> si ya se verificó. En ese caso se retoma el
+  // paso exactamente donde lo dejaría el sondeo tras escanear el QR.
+  async function volverDeLaWallet() {
+    const q = new URLSearchParams(location.search)
+    const error = q.get('error'), vuelta = q.get('vuelta')
+    if (!error && !vuelta) return
+    history.replaceState(null, '', BASE + '/')
+    const guardado = leerRetomar()
+    borrarRetomar()
+    if (error) { m.replaceChildren(el('h2', {}, 'No se pudo verificar'), el('div', { class: 'aviso error' }, error), el('div', { class: 'acciones' }, el('button', { class: 'claro', onclick: cerrar }, 'Cerrar'))); modal.showModal(); return }
+    if (!guardado || guardado.id !== vuelta) return
+    const { ok, cuerpo: r } = await api('/api/solicitud/' + encodeURIComponent(vuelta))
+    if (!ok || r.estado !== 'listo') return
+    busqueda = guardado.busqueda ?? null
+    if (guardado.proposito === 'identificacion') {
+      await cargarPersona()
+      if (guardado.elegir) elegir(guardado.elegir.v, guardado.elegir.tarifa); else ir(guardado.vista ?? 'reservar')
+    } else if (guardado.proposito === 'embarque') {
+      ir('embarque'); await resultadoEmbarque(r.embarque, vuelta)
+    } else if (guardado.proposito === 'permiso') {
+      const { cuerpo: previa } = await api('/api/solicitud/' + encodeURIComponent(guardado.previa))
+      if (previa.estado === 'listo') { ir('embarque'); await resultadoEmbarque(previa.embarque, guardado.previa, r.permiso).then(cargarManifiestos) }
+    }
+  }
 })()
 </script>
 </body>

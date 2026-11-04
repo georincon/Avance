@@ -106,13 +106,13 @@ export function crearEmisor({ url, gimnasio, firmante, socios, estado, abca, tru
   }
 
   /** Crea la oferta del documento `tipo` de un socio. Devuelve el enlace para la wallet y el PIN. */
-  function ofrecer(documento, tipo) {
+  function ofrecer(documento, tipo, reexpedir = false) {
     const doc = DOCUMENTOS[tipo]
     const codigo = azar()
     const pin = String(randomInt(0, 10000)).padStart(4, '0')
     const id = azar(16)
     const vence = Date.now() + VENCE_OFERTA_MS
-    codigos.set(codigo, { documento, tipo, configuracion: doc.configuracion, pin, vence, intentos: 0 })
+    codigos.set(codigo, { documento, tipo, reexpedir, configuracion: doc.configuracion, pin, vence, intentos: 0 })
     ofertas.set(id, {
       vence,
       oferta: {
@@ -222,7 +222,7 @@ export function crearEmisor({ url, gimnasio, firmante, socios, estado, abca, tru
 
     const jkt = req.headers.dpop ? await verificarDpop(req.headers.dpop, 'POST', `${url}/token`) : null
     const token = azar(32)
-    tokens.set(token, { documento: c.documento, tipo: c.tipo, configuracion: c.configuracion, vence: Date.now() + VENCE_TOKEN_S * 1000, jkt })
+    tokens.set(token, { documento: c.documento, tipo: c.tipo, reexpedir: c.reexpedir, configuracion: c.configuracion, vence: Date.now() + VENCE_TOKEN_S * 1000, jkt })
     console.log(`[emisor] token: ${c.tipo} de un socio (wallet ${wallet.cliente}, ${jkt ? 'DPoP' : 'Bearer'})`)
     json(res, { access_token: token, token_type: jkt ? 'DPoP' : 'Bearer', expires_in: VENCE_TOKEN_S })
   }))
@@ -265,6 +265,12 @@ export function crearEmisor({ url, gimnasio, firmante, socios, estado, abca, tru
     }
     const doc = DOCUMENTOS[t.tipo]
     const datos = datosDelDocumento(t.tipo, socio, gimnasio)
+
+    // Reexpedición: se retira lo anterior solo ahora que la nueva se entrega de verdad (si la persona no completa, no pierde nada).
+    if (t.reexpedir) {
+      const n = socios.reexpedir(socio.documento, t.tipo)
+      if (n) console.log(`[emisor] reexpedición: {n} copia(s) anterior(es) reemplazada(s)`)
+    }
 
     const credentials = []
     for (const prueba of pruebas) {

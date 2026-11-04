@@ -1,7 +1,9 @@
 (() => {
   const $ = (id) => document.getElementById(id)
   const token = localStorage.getItem('avance-control-token') || ''
-  if (!token) { location.replace('/'); return }
+  if (!token) { location.replace('/login?siguiente=%2Frecursos'); return }
+
+  $('salir')?.addEventListener('click', () => { try { localStorage.removeItem('avance-control-token') } catch {} location.replace('/login') })
 
   let foto = null, tab = 'contenedores', desfase = 0
   const abiertos = new Set()
@@ -218,7 +220,7 @@
     const rearmar = () => { clearTimeout(guardian); guardian = setTimeout(() => control.abort(), 45_000) }
     try {
       const r = await fetch('/api/recursos/stream', { headers: { authorization: 'Bearer ' + token }, signal: control.signal })
-      if (r.status === 401) { localStorage.removeItem('avance-control-token'); location.replace('/'); return }
+      if (r.status === 401) { localStorage.removeItem('avance-control-token'); location.replace('/login?siguiente=%2Frecursos'); return }
       if (!r.ok || !r.body) throw new Error('HTTP ' + r.status)
       vivo('en-vivo', 'En vivo')
       rearmar()

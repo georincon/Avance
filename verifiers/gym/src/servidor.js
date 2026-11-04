@@ -270,7 +270,7 @@ r.post('/api/oferta', conPersona(async (req, res, p) => {
   // Un socio que se afilió sin foto la recibe aquí, de su PID, para que la tarjeta la lleve.
   if (!s.foto && p.foto && socios.ponerFoto(p.documento, p.foto)) s = socios.buscar(p.documento)
   if (estadoDe(s) !== 'Activa') return res.status(409).json({ error: `Tu membresía está ${estadoDe(s).toLowerCase()}.` })
-  const o = emisor.ofrecer(s.documento, 'tarjeta')
+  const o = emisor.ofrecer(s.documento, 'tarjeta', req.body?.reexpedir === true)
   res.json({ ...o, qr: await QRCode.toDataURL(o.enlace, { margin: 1, width: 320 }) })
 }))
 
