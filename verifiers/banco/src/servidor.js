@@ -22,7 +22,7 @@ import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import express from 'express'
 import QRCode from 'qrcode'
-import { crearClientes } from './clientes.js'
+import { crearClientes, TIPOS, MAX_ACTIVAS } from './clientes.js'
 import { crearVerifier } from './verifier.js'
 
 const requerida = (nombre) => {
@@ -48,11 +48,14 @@ const clientes = crearClientes(process.env.CLIENTES_ARCHIVO ?? '/datos/clientes.
 const PEDIDOS = {
   ingreso: ['personal_administrative_number', 'given_name', 'family_name'],
   registro: ['personal_administrative_number', 'given_name', 'family_name', 'birthdate', 'picture'],
+  // Confirmar una operación delicada (cerrar una cuenta): la wallet vuelve a presentar el documento
+  // y la cédula tiene que ser la de la sesión.
+  confirmar: ['personal_administrative_number', 'given_name', 'family_name'],
 }
 
 // --- Sesiones y solicitudes en memoria (es un ejemplo: se pierden al reiniciar) -----------
 const sesiones = new Map()     // id → { cedula?, pendiente? }
-const solicitudes = new Map()  // id → { tipo, transaccion, sesion, creada, final? }
+const solicitudes = new Map()  // id → { tipo, transaccion, sesion, creada, accion?, final? }
 
 function sesion(req, res) {
   const id = /(?:^|;\s*)banco_sesion=([\w-]+)/.exec(req.headers.cookie ?? '')?.[1]
@@ -81,6 +84,19 @@ function completar(solicitud, { datos, emisor }) {
   if (!cedula) return { estado: 'rechazada', motivo: 'La wallet no compartió tu número de documento.' }
   const s = sesiones.get(solicitud.sesion)
 
+  if (solicitud.tipo === 'confirmar') {
+    // La operación solo se ejecuta si el documento presentado es el del titular de la sesión.
+    if (!s?.cedula || String(cedula) !== s.cedula) {
+      console.log(`[confirmar] rechazada: el documento presentado no es el de la sesión`)
+      return { estado: 'rechazada', motivo: 'El documento que presentaste no es el del titular de esta sesión.' }
+    }
+    const { cuenta } = solicitud.accion
+    const r = clientes.cerrarCuenta(s.cedula, cuenta)
+    if (r.error) return { estado: 'rechazada', motivo: r.error }
+    console.log(`[cierre] ${s.cedula} cerró la cuenta ${cuenta}${r.a ? ` (saldo trasladado a ${r.a})` : r.retirado ? ' (saldo retirado)' : ''}`)
+    return { estado: 'listo', destino: `${BASE}/cuenta`, cerrada: cuenta }
+  }
+
   if (solicitud.tipo === 'ingreso') {
     const cliente = clientes.registrarIngreso(String(cedula))
     if (!cliente) {
@@ -100,7 +116,7 @@ function completar(solicitud, { datos, emisor }) {
     return { estado: 'rechazada', motivo: `Tu documento venció el ${datos.date_of_expiry}. Pide uno nuevo en tu wallet.` }
   }
   if (clientes.buscar(String(cedula))) {
-    return { estado: 'rechazada', motivo: 'Ya tienes una cuenta con nosotros: ingresa con tu wallet.' }
+    return { estado: 'rechazada', motivo: 'Ya eres cliente: ingresa con tu wallet y abre otra cuenta desde «Mis cuentas».' }
   }
   const cliente = clientes.crear({
     cedula: String(cedula),
@@ -141,6 +157,15 @@ app.disable('x-powered-by')
 app.use(express.json())
 const r = express.Router()
 
+// Las rutas que modifican datos solo aceptan peticiones hechas desde las propias páginas del banco.
+const ORIGEN = new URL(URL_PUBLICA).origin
+r.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD') return next()
+  const origen = req.headers.origin
+  if (origen && origen !== ORIGEN) return res.status(403).json({ error: 'Origen no permitido.' })
+  next()
+})
+
 const pagina = (archivo) => readFileSync(new URL(`./publico/${archivo}`, import.meta.url), 'utf8')
   .replaceAll('{{BASE}}', BASE).replaceAll('{{NOMBRE}}', NOMBRE)
 const paginas = { inicio: pagina('index.html'), cuenta: pagina('cuenta.html') }
@@ -159,9 +184,18 @@ r.get('/cuenta', (req, res) => {
 
 // Empieza un ingreso o una apertura: devuelve el QR y el enlace para la wallet.
 r.post('/api/solicitud', async (req, res) => {
-  const { tipo, dispositivo } = req.body ?? {}
-  if (!PEDIDOS[tipo]) return res.status(400).json({ error: 'tipo: ingreso o registro' })
+  const { tipo, dispositivo, cuenta } = req.body ?? {}
+  if (!PEDIDOS[tipo]) return res.status(400).json({ error: 'tipo: ingreso, registro o confirmar' })
   const s = sesion(req, res)
+  let accion
+  if (tipo === 'confirmar') {
+    // Confirmar cierra una cuenta concreta: hay que haber ingresado y la cuenta debe estar activa.
+    if (!s.cedula) return res.status(401).json({ error: 'Ingresa con tu wallet primero.' })
+    const c = clientes.buscar(s.cedula)
+    const objetivo = c?.cuentas.find((x) => x.numero === String(cuenta ?? ''))
+    if (!objetivo || objetivo.estado !== 'activa') return res.status(404).json({ error: 'Esa cuenta no existe o ya está cerrada.' })
+    accion = { cuenta: objetivo.numero }
+  }
   try {
     const { transaccion, enlace } = await verifier.crearSolicitud({
       datos: PEDIDOS[tipo],
@@ -170,7 +204,7 @@ r.post('/api/solicitud', async (req, res) => {
       redireccion: dispositivo === 'mismo' ? `${URL_PUBLICA}/volver` : undefined,
     })
     const id = randomBytes(16).toString('base64url')
-    solicitudes.set(id, { tipo, transaccion, sesion: s.id, creada: Date.now() })
+    solicitudes.set(id, { tipo, transaccion, sesion: s.id, creada: Date.now(), accion })
     s.pendiente = id
     res.json({ id, enlace, qr: await QRCode.toDataURL(enlace, { margin: 1, width: 320 }) })
   } catch (e) {
@@ -199,7 +233,7 @@ r.get('/volver', async (req, res) => {
   if (!solicitud || !req.query.response_code) return fallo('No encontramos la solicitud. Inténtalo de nuevo desde este navegador.')
   try {
     const final = await consultar(solicitud, String(req.query.response_code))
-    if (final.estado === 'listo') return res.redirect(final.destino + (final.nuevo ? '?nueva=1' : ''))
+    if (final.estado === 'listo') return res.redirect(final.destino + (final.nuevo ? '?nueva=1' : final.cerrada ? `?cerrada=${encodeURIComponent(final.cerrada)}` : ''))
     return fallo(final.motivo ?? 'La wallet todavía no ha respondido.')
   } catch (e) {
     console.error(`[volver] ${e.message}`)
@@ -211,7 +245,17 @@ r.get('/api/yo', (req, res) => {
   const cedula = sesion(req, res).cedula
   const cliente = cedula && clientes.buscar(cedula)
   if (!cliente) return res.status(401).json({ error: 'sin sesión' })
-  res.json(cliente)
+  res.json({ ...cliente, tipos: TIPOS, max_activas: MAX_ACTIVAS })
+})
+
+// Abrir otra cuenta: ya se ingresó con la wallet, no hace falta repetir la presentación.
+r.post('/api/cuentas', (req, res) => {
+  const cedula = sesion(req, res).cedula
+  if (!cedula) return res.status(401).json({ error: 'sin sesión' })
+  const out = clientes.abrirCuenta(cedula, String(req.body?.tipo ?? ''))
+  if (out.error) return res.status(400).json({ error: out.error })
+  console.log(`[apertura] ${cedula} abrió la cuenta ${out.cuenta.numero} (${out.cuenta.tipo})`)
+  res.status(201).json(out.cuenta)
 })
 
 r.post('/api/salir', (req, res) => {

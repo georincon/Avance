@@ -25,6 +25,8 @@ import eu.europa.ec.eudi.pidissuer.adapter.out.util.maskDocumentNumber
 import eu.europa.ec.eudi.pidissuer.domain.CredentialConfigurationId
 import eu.europa.ec.eudi.pidissuer.port.input.CreateCredentialsOffer
 import eu.europa.ec.eudi.pidissuer.port.out.persistence.IsSubjectBlocked
+import eu.europa.ec.eudi.pidissuer.port.out.transito.CompareOnboardingSelfie
+import eu.europa.ec.eudi.pidissuer.port.out.transito.FaceMatchResult
 import eu.europa.ec.eudi.pidissuer.port.out.transito.FindLicenciaByDocumentNumber
 import eu.europa.ec.eudi.pidissuer.port.out.transito.GetOnboardingSession
 import eu.europa.ec.eudi.pidissuer.port.out.transito.OfferTickets
@@ -56,6 +58,7 @@ class OnboardingOffersApi(
     private val ticketApiKey: String?,
     private val rateLimit: IpRateLimit = IpRateLimit.disabled(),
     private val isSubjectBlocked: IsSubjectBlocked = IsSubjectBlocked { false },
+    private val compareSelfie: CompareOnboardingSelfie,
 ) {
     val router: RouterFunction<ServerResponse> =
         coRouter {
@@ -118,6 +121,17 @@ class OnboardingOffersApi(
         }
         if (licencia.categoriasVigentes(java.time.LocalDate.now()).isEmpty()) {
             return error(HttpStatus.CONFLICT, "LICENCIA_EXPIRED", listOf("NO_VALID_CATEGORIES"))
+        }
+
+        // La selfie del onboarding se compara con la foto de REFERENCIA de la licencia (no con la de la tarjeta que fotografió el
+        // usuario, que podría ser falsa). Si no se puede comprobar, no se emite.
+        when (val face = compareSelfie(sessionId, requireNotNull(licencia.fotoReferencia).bytes)) {
+            is FaceMatchResult.Match -> log.info("Selfie del onboarding coincide con la foto de la licencia ({}, score {})", documentNumber.maskDocumentNumber(), face.score)
+            is FaceMatchResult.NoMatch -> {
+                log.info("Selfie del onboarding NO coincide con la foto de la licencia ({}, score {})", documentNumber.maskDocumentNumber(), face.score)
+                return error(HttpStatus.FORBIDDEN, "FACE_MISMATCH")
+            }
+            is FaceMatchResult.Unavailable -> return error(HttpStatus.BAD_GATEWAY, "FACE_CHECK_UNAVAILABLE", listOf(face.reason))
         }
 
         val requestedFormats = body.credentialFormats.toSet()

@@ -86,3 +86,22 @@ nombre. La crea `up.sh` de este proyecto (o el de cada stack) si no existe.
 actual el certificado del borde (`*.avance.org.co`) es el que ve el cliente, así que la
 renovación local es opcional; el contenedor está por si se quiere un certificado propio válido
 para el dominio.
+
+## Acceso desde fuera de la red local y administración
+
+Todo el ecosistema se publica por el dominio (`civica-desarrollo.avance.org.co`) y funciona desde Internet: wallets, emisores, Keycloak
+público, onboarding, verificadores, listas de confianza y la descarga de la wallet (`/descargas/*`, `/login`). Es público a propósito.
+
+Lo que **no** es público son las superficies de administración: consolas de Keycloak (`/idp-*/admin`, `/idp-*/realms/master`), paneles de
+ciudadanos, estudiantes y licencias, la API del panel de control (`/api`), `/pki/issue` y `/pki/revoke`, y la API del publicador de listas.
+Desde una IP no autorizada responden 404 (como si no existieran).
+
+- **Autorizadas por defecto:** la red local, la salida a Internet de este sitio (`190.29.100.206`) y las IP de
+  `ips-admin-permitidas.conf`.
+- **Entrar desde fuera:** agregar la IP pública del equipo (la muestra https://api.ipify.org) a `ips-admin-permitidas.conf` con el formato
+  `<ip> 1;` y recargar: `docker exec nw-nginx nginx -t && docker exec nw-nginx nginx -s reload`.
+- **Cómo se sabe la IP real:** todo llega por el borde público, que añade la IP real al FINAL de `X-Forwarded-For`; nginx la toma con
+  `real_ip` (`set_real_ip_from 192.168.0.0/24`, `real_ip_recursive off`), así que un `X-Forwarded-For` falso del cliente no sirve. Si el borde
+  cambia de dirección fuera de esa red, hay que actualizar `set_real_ip_from`.
+- **Tope de intentos:** 20 por minuto y por IP a las pantallas donde se escribe una clave (login admin, token y login del realm master,
+  `/api/session`). Además los tres Keycloak tienen protección contra fuerza bruta en el realm master.

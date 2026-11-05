@@ -62,6 +62,43 @@ from app import oidc_metadata
 from app import session_manager
 from app import CONFIGURATION
 
+
+_NOMBRES_TRAMITE = {}
+
+
+def _nombres_desde_archivos():
+    """Respaldo: nombres leídos de metadata_config/credentials_supported/*.json (se cargan una sola vez)."""
+    if not _NOMBRES_TRAMITE:
+        import glob, os
+        carpeta = os.path.join(os.path.dirname(__file__), "metadata_config", "credentials_supported")
+        for ruta in glob.glob(os.path.join(carpeta, "*.json")):
+            try:
+                with open(ruta, encoding="utf-8") as f:
+                    for ident, cfg in json.load(f).items():
+                        d = (cfg.get("credential_metadata") or {}).get("display") or cfg.get("display") or []
+                        es = next((x for x in d if str(x.get("locale", "")).startswith("es")), d[0] if d else None)
+                        if es and es.get("name"):
+                            _NOMBRES_TRAMITE[ident] = es["name"]
+            except Exception:
+                continue
+    return _NOMBRES_TRAMITE
+
+
+def nombre_tramite(credencial_id):
+    """Nombre del trámite (p. ej. «Autenticación de firma») tomado de los metadatos de la credencial."""
+    if not credencial_id:
+        return None
+    try:
+        cfg = oidc_metadata["credential_configurations_supported"].get(credencial_id) or {}
+        displays = (cfg.get("credential_metadata") or {}).get("display") or cfg.get("display") or []
+        elegido = next((d for d in displays if str(d.get("locale", "")).startswith("es")), displays[0] if displays else None)
+        if elegido and elegido.get("name"):
+            return elegido["name"]
+    except Exception:
+        pass
+    return _nombres_desde_archivos().get(credencial_id)
+
+
 # /pid blueprint
 dynamic = Blueprint("dynamic", __name__, url_prefix="/dynamic")
 CORS(dynamic)  # enable CORS on the blue print
@@ -213,6 +250,7 @@ def dynamic_R1(country):
                 "mandatory_attributes": mandatory_attributes,
                 "optional_attributes": optional_attributes_filtered,
                 "credencial_id": credentials_requested[0] if credentials_requested else None,
+                "credencial_nombre": nombre_tramite(credentials_requested[0]) if credentials_requested else None,
                 "max_archivo_bytes": 50 * 1024 * 1024,
                 "redirect_url": f"{CONFIGURATION['service_url']}/dynamic/form",
                 "session_id": session_id,

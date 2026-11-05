@@ -52,6 +52,7 @@ class RateLimitedOnboardingOffersTest {
                     InMemoryOfferTickets(Clock.System),
                     "secret",
                     IpRateLimit(AttemptLimiter(max, 15.minutes, Clock.System), "X-Real-IP"),
+                    compareSelfie = { _, _ -> eu.europa.ec.eudi.pidissuer.port.out.transito.FaceMatchResult.Match(0.9) },
                 ).router,
             ).build()
 
@@ -110,6 +111,8 @@ class RateLimitedSolicitarTest {
                     FindLicenciaByDocumentNumber { null },
                     generateQrCode,
                     IpRateLimit(AttemptLimiter(max, 15.minutes, Clock.System), "X-Real-IP"),
+                    tickets = InMemoryOfferTickets(Clock.System),
+                    faceMatcher = SolicitarTestSupport.face(),
                 ).router,
             ).handlerStrategies(HandlerStrategies.builder().viewResolver(viewResolver).build())
             .build()
@@ -118,9 +121,8 @@ class RateLimitedSolicitarTest {
         post()
             .uri(TransitoSolicitarUi.SOLICITAR)
             .header("X-Real-IP", ip)
-            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .accept(MediaType.TEXT_HTML)
-            .body(BodyInserters.fromFormData("documentNumber", "99999999"))
+            .body(BodyInserters.fromMultipartData(SolicitarTestSupport.parts("99999999")))
             .exchange()
 
     @Test

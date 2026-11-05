@@ -8,7 +8,7 @@
 #   ./revocar.sh avisos      <registraduria|uis>          # avisos de revocacion sin entregar
 #   ./revocar.sh avisado     <registraduria|uis> <id>     # confirma que ya se aviso al titular
 #
-# El titular es el numero de cedula (registraduria) o el usuario del estudiante (uis).
+# El titular es el numero de cedula (registraduria) o el numero de identificacion del estudiante (uis; es tambien su usuario).
 # Motivos: user-request (lo pidio el titular), data-changed (cambiaron sus datos), fraud (posible fraude o
 # suplantacion), legal (decision legal o administrativa), other (por defecto). El motivo se le informa al titular.
 #

@@ -14,13 +14,13 @@ function aviso(){
   el.innerHTML='<span class="aviso-icono">ℹ</span><div><b>Hay más de una consola de Keycloak activa</b><br>'
     +'El proxy público deja el <code>Path</code> de todas las cookies en <code>/</code>, así que los Keycloak '
     +'comparten la sesión: si entras en una consola mientras usas la otra, se te cerrará. '
-    +'Con <b>Activar consola</b> se deja una sola en pie (las otras consolas no podrá usarse hasta que las vuelvas a activar).</div>';
+    +'Usa <b>Activar consola</b> para dejar solo uno en pie.</div>';
 }
 function summary(){const active=projects.filter(p=>p.state==='running').length;$('#total-count').textContent=projects.length;$('#active-count').textContent=active;$('#stopped-count').textContent=projects.filter(p=>p.state==='stopped').length;$('#quick-count').textContent=projects.length;$('#side-count').textContent=projects.length;$('#updated-at').textContent=new Intl.DateTimeFormat('es-CO',{hour:'2-digit',minute:'2-digit'}).format(new Date());$('#project-nav').innerHTML=projects.map(p=>'<a class="nav-item" href="#project-'+p.id+'"><span class="mini-status '+p.state+'"></span>'+p.name+'</a>').join('');aviso();}
 function render(){const q=$('#search').value.trim().toLocaleLowerCase('es'),f=$('#filter').value;const list=projects.filter(p=>(f==='all'||(f==='running'?p.state==='running':p.state==='stopped'))&&(p.name+' '+p.description+' '+p.group).toLocaleLowerCase('es').includes(q));$('#visible-count').textContent=list.length+' '+(list.length===1?'proyecto':'proyectos');if(!list.length){$('#cards').innerHTML='<div class="empty">No hay proyectos que coincidan con esta búsqueda.</div>';return;}const tarjeta=p=>{const canStop=p.state==='running'||p.state==='partial',isBusy=busy.has(p.id)||globalBusy;
 const k=p.keycloak;
 const kc=k?'<a class="open-link kc-link" href="'+k.url+'" target="_blank" rel="noreferrer"><span>🔑</span> '+k.name+'</a>'
-  +'<button class="action-button kc-button" data-action="activate" title="Deja este Keycloak en pie y detiene los Keycloak de los otros emisores"'+(isBusy?' disabled':'')+'><span>⇄</span> Activar consola</button>'
+  +'<button class="action-button kc-button" data-action="activate" title="Detiene los Keycloak de los otros emisores, deja este en pie, limpia las cookies y abre su consola"'+(isBusy?' disabled':'')+'><span>⇄</span> Activar consola</button>'
   +(k.running?'<span class="kc-on">En pie</span>':'')+(k.conflicto?'<span class="kc-warn" title="Otro Keycloak tambien esta en pie: las consolas comparten sesion">comparten sesión</span>':''):'';
 const act='<button class="action-button primary" data-action="up"'+(p.state==='running'||isBusy?' disabled':'')+'><span>▶</span> Levantar</button><button class="action-button" data-action="down"'+(!canStop||isBusy?' disabled':'')+'><span>■</span> Detener</button>';const meta=p.total?p.running+'/'+p.total+' contenedores activos':p.state==='unavailable'?'Inicia Docker para gestionar el stack':'Stack local disponible';
 const abrir=p.url?'<a class="open-link" href="'+p.url+'" target="_blank" rel="noreferrer"><span>↗</span> Abrir proyecto</a>':'<span class="open-link muted"><span>·</span> Sin ruta publica</span>';
@@ -41,7 +41,7 @@ function limpiarCookiesKeycloak(){
 }
 async function operate(id,action){const p=projects.find(x=>x.id===id);if(!p||busy.has(id))return;
 if(action==='down'&&!confirm('¿Detener todos los servicios de '+p.name+'?'))return;
-if(action==='activate'&&!confirm('¿Dejar en pie el Keycloak de '+p.name+' y detener el del otro emisor?\n\nLas dos consolas comparten sesión: por eso no pueden estar las dos activas.'))return;
+if(action==='activate'&&!confirm('¿Activar la consola de Keycloak de '+p.name+'?\n\nSe DETIENEN los Keycloak de los otros emisores (Registraduría, Tránsito, UIS). Mientras estén apagados esos emisores no pueden emitir credenciales: vuelve a encenderlos con «Levantar» en su tarjeta.'))return;
 busy.add(id);render();
 toast((action==='up'?'Levantando':action==='down'?'Deteniendo':action==='activate'?'Activando consola de':'Reiniciando')+' '+p.name+'…');
 try{const r=await request(apiBase+'projects/'+id+'/action',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action})});const result=await r.json();if(!r.ok)throw Error(result.error||'La operación falló.');

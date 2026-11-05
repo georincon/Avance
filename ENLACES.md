@@ -193,7 +193,7 @@ Verificados el 2026-10-30 (todos 200).
 
 | Código | Enlace | Qué es |
 |---|---|---|
-| 200 | `/pid-transito/transito/solicitar` | Pantalla ciudadana: pide el mDL, sin login |
+| 200 | `/pid-transito/transito/solicitar` | Pantalla para pedir el mDL: autoservicio; cédula + nombres, apellidos y fecha de nacimiento (se homologan con la licencia) + selfie (se compara con la foto de la licencia) |
 | 200 | `/pid-transito/transito/admin/login` | Login del panel admin de licencias |
 | 200 | `/pid-transito/.well-known/openid-credential-issuer` | Metadata OID4VCI (`org.iso.18013.5.1.mDL`) |
 | 200 | `/idp-tra/realms/pid-transito-realm/` | Realm de Keycloak de Tránsito |

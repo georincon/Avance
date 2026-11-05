@@ -71,6 +71,7 @@ class BlockedSubjectIssuanceTest {
                     InMemoryOfferTickets(Clock.System),
                     "secret",
                     isSubjectBlocked = { blocked },
+                    compareSelfie = { _, _ -> eu.europa.ec.eudi.pidissuer.port.out.transito.FaceMatchResult.Match(0.9) },
                 ).router,
             ).build()
 
@@ -100,16 +101,15 @@ class BlockedSubjectIssuanceTest {
     private fun screen(blocked: Boolean): WebTestClient =
         WebTestClient
             .bindToRouterFunction(
-                TransitoSolicitarUi(createCredentialsOffer, { licencia }, generateQrCode, isSubjectBlocked = { blocked }).router,
+                TransitoSolicitarUi(createCredentialsOffer, { licencia }, generateQrCode, isSubjectBlocked = { blocked }, tickets = InMemoryOfferTickets(Clock.System), faceMatcher = SolicitarTestSupport.face()).router,
             ).handlerStrategies(HandlerStrategies.builder().viewResolver(viewResolver).build())
             .build()
 
     private fun WebTestClient.solicitar(): String =
         post()
             .uri(TransitoSolicitarUi.SOLICITAR)
-            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .accept(MediaType.TEXT_HTML)
-            .body(BodyInserters.fromFormData("documentNumber", "12345678"))
+            .body(BodyInserters.fromMultipartData(SolicitarTestSupport.parts("12345678")))
             .exchange()
             .expectStatus()
             .isOk

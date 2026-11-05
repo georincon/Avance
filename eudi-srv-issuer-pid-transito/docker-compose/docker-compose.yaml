@@ -43,7 +43,7 @@ services:
       context: ./keycloak
       args:
         VERSION: ${KEYCLOAK_ABCA_EXTENSION_VERSION}
-    image: keycloak-abca:${KEYCLOAK_ABCA_EXTENSION_VERSION}
+    image: keycloak-abca-tra:${KEYCLOAK_ABCA_EXTENSION_VERSION}
     container_name: keycloak-tra
     restart: unless-stopped
     command:
@@ -210,6 +210,8 @@ services:
       # por nombre de servicio. (Antes era http://192.168.0.240:8195: una IP suelta y un
       # puerto que ya no existe.)
       - ISSUER_ONBOARDING_BACKEND_URL=http://onboarding-backend:8095
+      # Clave para pedirle al onboarding que compare la selfie de la sesión con la foto de la licencia (misma del onboarding).
+      - ISSUER_ONBOARDING_INTERNAL_API_KEY=${ONBOARDING_INTERNAL_API_KEY:-onb-internal-dev-key-change-me}
       - ISSUER_TICKET_API_KEY=${TRA_TICKET_API_KEY:-tra-dev-ticket-key-change-me}
       # El issuer exige que el client_status presentado por la wallet cubra el período preferido,
       # y que este sea al menos igual a la vigencia de la credencial. La wallet actual no presenta

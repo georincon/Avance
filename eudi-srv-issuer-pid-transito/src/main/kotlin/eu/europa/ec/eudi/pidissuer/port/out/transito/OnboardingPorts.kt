@@ -59,7 +59,55 @@ sealed interface TicketRedemption {
 }
 
 interface OfferTickets {
-    fun issue(documentNumber: String): String
+    /** [ttl] opcional: vigencia propia del ticket (por defecto, la del almacén). */
+    fun issue(documentNumber: String, ttl: kotlin.time.Duration? = null): String
 
     fun redeem(ticket: String): TicketRedemption
+}
+
+/** Resultado de la comprobación de la selfie. */
+sealed interface SelfieCheck {
+    /** La selfie sirve para comparar (un solo rostro, tamaño y nitidez suficientes). */
+    data object Ok : SelfieCheck
+
+    /** La selfie no sirve (sin rostro, borrosa...): [reason] se le muestra a quien la tomó. */
+    data class Bad(
+        val reason: String,
+    ) : SelfieCheck
+
+    data class Unavailable(
+        val reason: String,
+    ) : SelfieCheck
+}
+
+sealed interface FaceMatchResult {
+    data class Match(
+        val score: Double,
+    ) : FaceMatchResult
+
+    data class NoMatch(
+        val score: Double?,
+    ) : FaceMatchResult
+
+    data class Unavailable(
+        val reason: String,
+    ) : FaceMatchResult
+}
+
+/**
+ * Comparación biométrica contra la foto de referencia de la Registraduría. Solo mide calidad de captura y parecido facial:
+ * NO es prueba de vida (una foto de la persona mostrada a la cámara podría pasar).
+ */
+interface FaceMatcher {
+    suspend fun checkSelfie(selfie: ByteArray): SelfieCheck
+
+    suspend fun match(reference: ByteArray, selfie: ByteArray): FaceMatchResult
+}
+
+/**
+ * Compara la selfie que quedó guardada en la sesión de onboarding con la foto de referencia de la Registraduría. La selfie
+ * no sale del servicio de onboarding: el issuer solo envía la foto del registro y recibe el veredicto.
+ */
+fun interface CompareOnboardingSelfie {
+    suspend operator fun invoke(sessionId: String, reference: ByteArray): FaceMatchResult
 }

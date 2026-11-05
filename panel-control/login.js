@@ -4,7 +4,9 @@
   const $ = (s) => document.querySelector(s)
   const CLAVE = 'avance-control-token'
   const url = new URL(location.href)
-  const siguiente = url.searchParams.get('siguiente') && url.searchParams.get('siguiente').startsWith('/') ? url.searchParams.get('siguiente') : '/'
+  const pedido = url.searchParams.get('siguiente') || ''
+  // Solo rutas locales: una sola barra inicial (// o /\ llevarían a otro sitio).
+  const siguiente = /^\/(?![\/\\])/.test(pedido) ? pedido : '/'
 
   // Ya hay una clave guardada y es válida: directo al panel.
   const guardada = (() => { try { return localStorage.getItem(CLAVE) } catch { return null } })()
@@ -14,6 +16,7 @@
     try {
       const r = await fetch('/api/session', { headers: { authorization: 'Bearer ' + clave }, cache: 'no-store' })
       if (r.status === 429) return 'demasiados'
+      if (r.status === 404) return 'restringido'   // el borde oculta la API del panel fuera de las redes autorizadas
       return r.ok
     } catch { return 'red' }
   }
@@ -29,7 +32,8 @@
     err.hidden = true; boton.disabled = true; boton.textContent = 'Verificando…'
     const ok = await validar(clave)
     if (ok === true) { try { localStorage.setItem(CLAVE, clave) } catch {} ; location.replace(siguiente); return }
-    err.textContent = ok === 'demasiados' ? 'Demasiados intentos fallidos. Espera un minuto e inténtalo de nuevo.'
+    err.textContent = ok === 'restringido' ? 'Desde esta red no se puede administrar el panel. Pide que autoricen tu IP pública (srv-nw-nginx/ips-admin-permitidas.conf).'
+      : ok === 'demasiados' ? 'Demasiados intentos fallidos. Espera un minuto e inténtalo de nuevo.'
       : ok === 'red' ? 'No hay conexión con el panel.' : 'La clave no es correcta.'
     err.hidden = false; boton.disabled = false; boton.textContent = 'Ingresar'; $('#clave').select()
   })

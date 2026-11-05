@@ -24,15 +24,43 @@
 <main class="container p-4" style="max-width: 480px;">
     <h2 class="mb-3">Pide tu licencia de conducción digital</h2>
     <p class="text-body-secondary">
-        Escribe tu número de cédula. Si tu licencia está activa y tiene categorías vigentes, te generamos un código QR para que lo escanees con tu wallet de identidad digital y la recibas como licencia de conducción móvil (mDL, ISO 18013-5).</p>
+        Escribe tu cédula, tus nombres, apellidos y fecha de nacimiento como aparecen en ella, y tómate una selfie: comparamos los datos y la selfie con los de la Dirección de Tránsito.
+        Si tu licencia está activa y coincide, te generamos un código QR para que lo escanees con tu wallet de identidad digital y la recibas como licencia de conducción móvil (mDL, ISO 18013-5). La selfie no se guarda.</p>
 
     <div class="alert alert-danger" th:if="${error}" th:text="${error}">Error</div>
 
-    <form method="post" th:action="@{/transito/solicitar}">
+    <form method="post" enctype="multipart/form-data" th:action="@{/transito/solicitar}">
         <div class="mb-4">
             <label for="documentNumber" class="form-label">Número de cédula</label>
             <input type="text" class="form-control form-control-lg" id="documentNumber" name="documentNumber"
                    inputmode="numeric" autofocus required>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-12 col-sm-6">
+                <label for="firstNames" class="form-label">Nombres</label>
+                <input type="text" class="form-control" id="firstNames" name="firstNames" autocomplete="off" required>
+            </div>
+            <div class="col-12 col-sm-6">
+                <label for="lastNames" class="form-label">Apellidos</label>
+                <input type="text" class="form-control" id="lastNames" name="lastNames" autocomplete="off" required>
+            </div>
+            <div class="col-12">
+                <label for="birthDate" class="form-label">Fecha de nacimiento</label>
+                <input type="date" class="form-control" id="birthDate" name="birthDate" required>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Selfie</label>
+            <video id="selfie-video" class="w-100 rounded border" autoplay playsinline muted hidden></video>
+            <img id="selfie-preview" class="w-100 rounded border" alt="Tu selfie" hidden>
+            <canvas id="selfie-canvas" hidden></canvas>
+            <div class="d-flex gap-2 mt-2 flex-wrap">
+                <button type="button" class="btn btn-outline-secondary" id="selfie-start">Abrir cámara</button>
+                <button type="button" class="btn btn-outline-primary" id="selfie-shot" hidden>Tomar selfie</button>
+                <button type="button" class="btn btn-outline-secondary" id="selfie-retry" hidden>Repetir</button>
+            </div>
+            <input type="file" class="form-control mt-2" id="selfie-file" name="selfie" accept="image/*" capture="user" required>
+            <div class="form-text">Si tu navegador no abre la cámara, elige una foto de tu rostro de frente y con buena luz.</div>
         </div>
         <button type="submit" class="btn btn-primary btn-lg w-100">Generar código QR</button>
     </form>
@@ -41,5 +69,6 @@
         Datos de prueba. Esto es un emulador — no envíes tu cédula real si no estás haciendo pruebas autorizadas.
     </p>
 </main>
+<script type="application/javascript" th:src="@{/public/js/transito-solicitar.js}"></script>
 </body>
 </html>

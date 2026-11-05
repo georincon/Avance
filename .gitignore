@@ -1,1 +1,4 @@
 *.apk
+
+# Secretos locales del ecosistema (clave interna del onboarding)
+/.env

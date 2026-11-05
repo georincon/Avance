@@ -23,10 +23,16 @@
 </div>
 <main class="container p-4" style="max-width: 480px;">
     <h2 class="mb-2">Hola, <span th:text="${nombres}">ciudadano</span></h2>
-    <h5 class="mb-1 text-body-secondary">Escanea este código con tu wallet</h5>
+    <h5 class="mb-1 text-body-secondary" id="titulo-qr">Escanea este código con tu wallet</h5>
     <p class="mb-3 text-body-secondary" th:if="${categorias}">Categorías: <strong th:text="${categorias}">B1, C1</strong></p>
 
-    <div class="d-flex justify-content-center mb-3">
+    <div class="mb-3 solo-movil" hidden>
+        <a class="btn btn-primary btn-lg w-100" id="abrir-wallet" th:href="${uri}" th:attr="data-offer=${uri}">Compartir con mi wallet</a>
+        <p class="text-center text-body-secondary small mt-2 mb-0">Estás en el celular: envía la solicitud directo a tu wallet, sin escanear el código.
+            Si no la tienes instalada, te llevamos a descargarla.</p>
+    </div>
+
+    <div class="d-flex justify-content-center mb-3 qr-bloque">
         <!--/*@thymesVar id="qrCode" type="kotlin.String"*/-->
         <img class="qr-code" th:src="'data:' + ${qrCodeMediaType} + ';base64,' + ${qrCode}" alt="Código QR">
     </div>
@@ -42,5 +48,6 @@
 
     <a class="btn btn-outline-secondary w-100" th:href="@{/transito/solicitar}">Hacer otra solicitud</a>
 </main>
+<script type="application/javascript" th:src="@{/public/js/abrir-wallet.js}"></script>
 </body>
 </html>

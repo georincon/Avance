@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     {% include 'partials/cabeza.html' %}
-    <title>Datos del trámite · Notaría Avance</title>
+    <title>{{ credencial_nombre or 'Datos del trámite' }} · Notaría Avance</title>
 </head>
 <body>
     {% include 'partials/cabecera.html' %}
@@ -16,7 +16,8 @@
             <label for="f_{{ name }}">{{ etq }}{% if not opcional %} <span class="req">*</span>{% endif %}{% if attr.from_pid %}<span class="chip">de tu PID</span>{% endif %}</label>
             {% if attr.options is defined and attr.options %}
             <select id="f_{{ name }}" name="{{ name }}" {{ '' if opcional else 'required' }}>
-                {% for option in attr.options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}
+                <option value="" selected {{ '' if opcional else 'disabled' }}>Selecciona una opción…</option>
+                {% for option in attr.options %}<option value="{{ option }}" {{ 'selected' if attr.filled_value == option else '' }}>{{ option }}</option>{% endfor %}
             </select>
             {% elif attr.type == 'bool' %}
             <select id="f_{{ name }}" name="{{ name }}"><option value="true">Sí</option><option value="false">No</option></select>
@@ -49,7 +50,7 @@
     {% endmacro %}
 
     <main class="pagina estrecha" role="main">
-        <h1>Datos del trámite</h1>
+        <h1>{{ credencial_nombre or 'Datos del trámite' }}</h1>
         <p class="sub">Escribe los datos tal como deben quedar en el documento. Lo demás (número, fecha, notario, advertencia legal) lo pone la notaría.</p>
 
         <form id="selectCountryForm" method="post" action="{{ redirect_url }}" enctype="multipart/form-data">
@@ -118,14 +119,33 @@
     </script>
     {% endif %}
     <script>
-    // Selector de fecha con límites razonables (el servidor los vuelve a comprobar): las fechas "de un hecho" no pueden
-    // ser futuras, y las de vigencia, salida o regreso no pueden ser pasadas. El regreso no puede ser antes de la salida.
+    // Límites de las fechas SIN usar los atributos min/max del campo: con ellos algunos navegadores recortan o reescriben el año
+    // mientras se escribe (2023 queda como 0023). El campo de fecha queda libre y aquí solo se valida el valor ya completo.
+    // Las fechas "de un hecho" no pueden ser futuras; las de vigencia, salida o regreso no pueden ser pasadas; el regreso no
+    // puede ser antes de la salida. El servidor vuelve a comprobarlo todo.
     (function () {
       var d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
       var hoy = d.toISOString().slice(0, 10);
-      document.querySelectorAll('input[type=date][data-limite]').forEach(function (i) { i.setAttribute(i.dataset.limite, hoy); });
+      var ANIO = /^\d{4}-\d{2}-\d{2}$/;
       var salida = document.getElementById('f_fecha_salida'), regreso = document.getElementById('f_fecha_regreso');
-      if (salida && regreso) salida.addEventListener('change', function () { regreso.min = salida.value || hoy; if (regreso.value && regreso.value < regreso.min) regreso.value = ''; });
+
+      function validar(i) {
+        var v = i.value, lim = i.dataset.limite, msg = '';
+        // Mientras el año no tenga 4 cifras el navegador entrega "" (vacío): no se dice nada hasta que haya un valor completo.
+        if (ANIO.test(v)) {
+          var anio = parseInt(v.slice(0, 4), 10);
+          if (anio < 1900) msg = 'El año debe tener cuatro cifras (por ejemplo, 2023).';
+          else if (lim === 'max' && v > hoy) msg = 'La fecha no puede ser posterior a hoy.';
+          else if (lim === 'min' && v < hoy) msg = 'La fecha no puede ser anterior a hoy.';
+          else if (i === regreso && salida && ANIO.test(salida.value) && v < salida.value) msg = 'El regreso no puede ser antes de la salida.';
+        }
+        i.setCustomValidity(msg);
+      }
+      document.querySelectorAll('input[type=date]').forEach(function (i) {
+        ['input', 'change', 'blur'].forEach(function (ev) { i.addEventListener(ev, function () { validar(i); }); });
+        validar(i);
+      });
+      if (salida && regreso) salida.addEventListener('change', function () { validar(regreso); });
     })();
     </script>
 </body>

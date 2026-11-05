@@ -7,6 +7,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 
 from app import documento_archivo
+from app.opciones import ETIQUETAS, opciones_del_formulario
 
 # campo: (regla, mensaje)  — pasado = no puede ser futura; futuro = no puede ser anterior a hoy
 REGLAS = {
@@ -51,6 +52,22 @@ def validar_fechas(form_data: dict):
     return None
 
 
-def validar(form_data: dict):
-    """Devuelve None si todo está bien (y normaliza form_data) o un mensaje de error para la persona."""
-    return documento_archivo.validar(form_data) or validar_fechas(form_data)
+def validar_opciones(form_data: dict):
+    """Los campos de lista cerrada solo admiten una de sus opciones."""
+    for campo, opciones in opciones_del_formulario(form_data.keys()).items():
+        valor = form_data.get(campo)
+        if valor in (None, ""):
+            continue
+        if str(valor).strip() not in opciones:
+            return f"Elige {ETIQUETAS[campo]} de la lista."
+        form_data[campo] = str(valor).strip()
+    return None
+
+
+def validar(form_data: dict, listas_cerradas: bool = True):
+    """Devuelve None si todo está bien (y normaliza form_data) o un mensaje de error para la persona.
+
+    `listas_cerradas`: en el formulario web los campos de lista (estado civil, entidad de destino) solo admiten sus opciones.
+    El API de órdenes de la plataforma envía texto libre en esos campos (contrato publicado), así que no lo exige.
+    """
+    return documento_archivo.validar(form_data) or (validar_opciones(form_data) if listas_cerradas else None) or validar_fechas(form_data)

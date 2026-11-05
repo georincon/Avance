@@ -70,8 +70,12 @@ fun configureUiSecurity(
             authorize(anyExchange, denyAll)
         }
 
-        // enable csrf
-        csrf { }
+        // enable csrf (también en cuerpos multipart: el formulario público /transito/solicitar sube la selfie)
+        csrf {
+            csrfTokenRequestHandler =
+                org.springframework.security.web.server.csrf.XorServerCsrfTokenRequestAttributeHandler()
+                    .apply { setTokenFromMultipartDataEnabled(true) }
+        }
 
         // enable cors
         cors { }

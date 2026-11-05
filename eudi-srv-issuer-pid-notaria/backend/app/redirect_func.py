@@ -99,7 +99,7 @@ def post_redirect_with_payload(target_url: str, data_payload: dict):
     </head>
     <body>
         <form id="redirect_form" method="POST" action="{{ url }}">
-            <input type="hidden" name="payload" value='{{ data | safe }}'>
+            <input type="hidden" name="payload" value="{{ data }}">
             <noscript>
                 <div style="font-family: sans-serif; padding: 20px; text-align: center;">
                     <p>JavaScript is required. Please click the button below:</p>
@@ -117,7 +117,8 @@ def post_redirect_with_payload(target_url: str, data_payload: dict):
     </html>
     """
 
-    # 3. Render the HTML with the specific URL and data
+    # 3. Render the HTML with the specific URL and data. `data` se escapa (autoescape de Jinja) y va entre comillas dobles:
+    #    antes se insertaba con `|safe` entre comillas simples y un ' en un dato (p. ej. un apellido) rompia el atributo.
     return render_template_string(
         AUTO_SUBMIT_HTML, url=target_url, data=json_data_string
     )

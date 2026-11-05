@@ -56,6 +56,7 @@ class OnboardingOffersApiTest {
         found: Licencia? = licencia,
         tickets: InMemoryOfferTickets = InMemoryOfferTickets(Clock.System),
         apiKey: String? = "secret",
+        face: eu.europa.ec.eudi.pidissuer.port.out.transito.FaceMatchResult = eu.europa.ec.eudi.pidissuer.port.out.transito.FaceMatchResult.Match(0.9),
     ): WebTestClient =
         WebTestClient
             .bindToRouterFunction(
@@ -65,6 +66,7 @@ class OnboardingOffersApiTest {
                     FindLicenciaByDocumentNumber { found },
                     tickets,
                     apiKey,
+                    compareSelfie = { _, _ -> face },
                 ).router,
             ).build()
 

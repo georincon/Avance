@@ -59,16 +59,15 @@ class TransitoSolicitarUiTest {
     private fun client(found: Licencia?): WebTestClient =
         WebTestClient
             .bindToRouterFunction(
-                TransitoSolicitarUi(createCredentialsOffer, FindLicenciaByDocumentNumber { found }, generateQrCode).router,
+                TransitoSolicitarUi(createCredentialsOffer, FindLicenciaByDocumentNumber { found }, generateQrCode, tickets = eu.europa.ec.eudi.pidissuer.adapter.out.transito.InMemoryOfferTickets(kotlin.time.Clock.System), faceMatcher = SolicitarTestSupport.face()).router,
             ).handlerStrategies(HandlerStrategies.builder().viewResolver(viewResolver).build())
             .build()
 
     private fun WebTestClient.solicitar(documentNumber: String): String =
         post()
             .uri(TransitoSolicitarUi.SOLICITAR)
-            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .accept(MediaType.TEXT_HTML)
-            .body(BodyInserters.fromFormData("documentNumber", documentNumber))
+            .body(BodyInserters.fromMultipartData(SolicitarTestSupport.parts(documentNumber)))
             .exchange()
             .expectStatus()
             .isOk
@@ -121,6 +120,51 @@ class TransitoSolicitarUiTest {
     fun `a blank licencia is rejected`() {
         val page = client(found = complete).solicitar("   ")
         assertTrue(page.contains("Debes ingresar tu número de cédula"))
+    }
+
+    private fun clientWith(face: eu.europa.ec.eudi.pidissuer.port.out.transito.FaceMatcher): WebTestClient =
+        WebTestClient
+            .bindToRouterFunction(
+                TransitoSolicitarUi(
+                    createCredentialsOffer,
+                    FindLicenciaByDocumentNumber { complete },
+                    generateQrCode,
+                    tickets = eu.europa.ec.eudi.pidissuer.adapter.out.transito.InMemoryOfferTickets(kotlin.time.Clock.System),
+                    faceMatcher = face,
+                ).router,
+            ).handlerStrategies(HandlerStrategies.builder().viewResolver(viewResolver).build())
+            .build()
+
+    private fun WebTestClient.post(parts: org.springframework.util.MultiValueMap<String, *>): String =
+        post()
+            .uri(TransitoSolicitarUi.SOLICITAR)
+            .accept(MediaType.TEXT_HTML)
+            .body(BodyInserters.fromMultipartData(parts))
+            .exchange()
+            .expectBody(String::class.java)
+            .returnResult()
+            .responseBody
+            .orEmpty()
+
+    @Test
+    fun `a selfie that does not match the license photo gets the generic error and no offer`() {
+        val page = clientWith(SolicitarTestSupport.face(match = eu.europa.ec.eudi.pidissuer.port.out.transito.FaceMatchResult.NoMatch(0.1)))
+            .post(SolicitarTestSupport.parts("12345678"))
+        assertTrue(page.contains(TransitoSolicitarUi.GENERIC_ERROR))
+        assertFalse(page.contains("credential_offer"))
+    }
+
+    @Test
+    fun `declared data that differs from the license gets the generic error and no offer`() {
+        val page = clientWith(SolicitarTestSupport.face()).post(SolicitarTestSupport.parts("12345678", birthDate = "1980-01-01"))
+        assertTrue(page.contains(TransitoSolicitarUi.GENERIC_ERROR))
+        assertFalse(page.contains("credential_offer"))
+    }
+
+    @Test
+    fun `a verified request gets an offer that carries a one-time issuer_state ticket`() {
+        val page = clientWith(SolicitarTestSupport.face()).post(SolicitarTestSupport.parts("12345678"))
+        assertTrue(page.contains("issuer_state"))
     }
 }
 

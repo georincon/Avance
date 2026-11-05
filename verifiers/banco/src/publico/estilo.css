@@ -530,3 +530,32 @@ dd { margin: 0; word-break: break-word; }
   .usuario span.nombre { display: none; }
   .saldo .valor { font-size: 2rem; }
 }
+
+
+/* ── Varias cuentas ─────────────────────────────────────────────────────── */
+
+.cuentas { display: flex; gap: 12px; flex-wrap: wrap; margin: 0 0 22px; }
+.tarjeta-cuenta {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  background: var(--blanco); color: var(--negro);
+  border: 1px solid var(--platino); border-radius: var(--r-tarjeta);
+  padding: 14px 18px; min-width: 190px; text-align: left; box-shadow: var(--sombra-4);
+}
+.tarjeta-cuenta .tipo { color: var(--piedra); font-size: .85rem; }
+.tarjeta-cuenta strong { font-size: 1.2rem; font-weight: 500; }
+.tarjeta-cuenta .num { color: var(--gris-med); font-size: .8rem; }
+.tarjeta-cuenta:hover { border-color: var(--nu-p); }
+.tarjeta-cuenta.activa { border: 2px solid var(--nu-p); }
+.tarjeta-cuenta.nueva { justify-content: center; align-items: center; color: var(--nu-p); border-style: dashed; font-weight: 500; }
+
+.nota { color: var(--piedra); font-size: .93rem; margin: 0 0 14px; }
+.peligro { background: var(--rojo-tenue); color: #C22A2A; border: 1px solid var(--rojo); }
+.peligro:hover { background: var(--rojo); color: var(--blanco); }
+.zona-peligro h2 { color: #C22A2A; }
+.vacia { text-align: center; }
+.cerradas { margin-top: 20px; }
+.cerradas summary { cursor: pointer; font-weight: 500; }
+.cerradas table { width: 100%; margin-top: 12px; }
+.tipos { display: grid; gap: 10px; margin-bottom: 18px; }
+.tipo-op { background: var(--humo); color: var(--negro); border: 2px solid transparent; justify-content: flex-start; border-radius: var(--r-chico); }
+.tipo-op.activa { border-color: var(--nu-p); background: var(--blanco); }

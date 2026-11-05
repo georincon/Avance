@@ -516,6 +516,7 @@ function send(res, code, data) {
   res.end(body);
 }
 const fallosLogin = new Map();
+setInterval(() => { const ahora = Date.now(); for (const [ip, t] of fallosLogin) if (!t.some((x) => ahora - x < 60_000)) fallosLogin.delete(ip); }, 60_000).unref();
 function authorized(req) {
   const value = req.headers.authorization || '';
   const supplied = value.startsWith('Bearer ') ? Buffer.from(value.slice(7)) : Buffer.alloc(0);
@@ -654,10 +655,9 @@ const server = http.createServer(async (req, res) => {
         if (!['up','down','restart','activate'].includes(action)) return send(res, 400, {error:'Acción no permitida.'});
         if (action === 'activate') {
           if (!project.keycloakService) return send(res, 400, {error:'Este proyecto no tiene un Keycloak que activar.'});
-          // 1) Se detiene el Keycloak del OTRO emisor. Es lo que evita que las dos
-          //    consolas compartan sesion: el proxy publico deja el Path de las
-          //    cookies en "/", asi que un AUTH_SESSION_ID compartido invalida la
-          //    sesion del otro Keycloak en cuanto se entra en su consola.
+          // 1) Se detiene el Keycloak del OTRO emisor (decision del operador): asi las consolas no comparten sesion. El proxy publico deja
+          //    el Path de las cookies en "/", y un AUTH_SESSION_ID compartido invalida la sesion del otro Keycloak. Mientras esten
+          //    apagados, esos emisores no pueden emitir: se vuelven a encender con "Levantar" en su tarjeta.
           for (const parId of project.peerIds || []) {
             const par = projects.find((item) => item.id === parId);
             if (par) await run(composeArgs({ ...par, composeFiles: composeDe(par) }, ['stop', par.keycloakService]), par.directory, 5 * 60_000);
@@ -703,7 +703,15 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, {error:'Ruta no encontrada.'});
   }
 
-  const relative = pathname === '/' ? 'index.html' : pathname === '/recursos' ? 'recursos.html' : pathname === '/login' ? 'login.html' : decodeURIComponent(pathname.slice(1));
+  // Una URL con una secuencia % mal formada (p. ej. /%E0%A4%A) hace que decodeURIComponent lance una excepción: se responde 400.
+  let relative;
+  try {
+    relative = pathname === '/' ? 'index.html' : pathname === '/recursos' ? 'recursos.html' : pathname === '/login' ? 'login.html' : decodeURIComponent(pathname.slice(1));
+  } catch {
+    res.writeHead(400, {'content-type':'text/plain; charset=utf-8'});
+    return res.end('Solicitud no válida');
+  }
+  if (relative.includes('\0')) { res.writeHead(400); return res.end('Solicitud no válida'); }
   const file = path.resolve(projectDir, relative);
   if (!file.startsWith(projectDir + path.sep)) {
     res.writeHead(403);

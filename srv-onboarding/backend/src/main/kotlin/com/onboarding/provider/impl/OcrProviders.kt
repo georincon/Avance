@@ -84,7 +84,83 @@ class Pdf417OcrProvider : DocumentOcrProvider {
                 }
             }
         }
+        decodeConPreprocesado(original, reader)?.let { return it }
         error("sin codigo PDF417 detectable")
+    }
+
+    /**
+     * Segundo intento para fotos de camaras que entregan pocos pixeles por modulo (p. ej. 8 MP):
+     * recorta la banda donde suele estar el codigo, la amplia y la binariza con varios umbrales.
+     * Solo se ejecuta si la lectura normal fallo.
+     */
+    private fun decodeConPreprocesado(original: BufferedImage, reader: MultiFormatReader): String? {
+        val w = original.width
+        val h = original.height
+        // (x, y, ancho, alto) como fraccion de la imagen
+        val bandas = listOf(
+            doubleArrayOf(0.10, 0.45, 0.80, 0.40),
+            doubleArrayOf(0.20, 0.55, 0.65, 0.25),
+        )
+        for (b in bandas) {
+            val x = (w * b[0]).toInt()
+            val y = (h * b[1]).toInt()
+            val bw = (w * b[2]).toInt().coerceAtMost(w - x)
+            val bh = (h * b[3]).toInt().coerceAtMost(h - y)
+            if (bw < 50 || bh < 50) continue
+            val recorte = original.getSubimage(x, y, bw, bh)
+            for (factor in listOf(1.5, 2.0, 2.5)) {
+                val gris = aGrisEscalado(recorte, factor)
+                for (umbral in listOf(0, 90, 100, 110, 80, 120)) {
+                    val img = if (umbral == 0) gris else binarizar(gris, umbral)
+                    for (binarizer in listOf<(BufferedImageLuminanceSource) -> com.google.zxing.Binarizer>(
+                        { HybridBinarizer(it) },
+                        { GlobalHistogramBinarizer(it) },
+                    )) {
+                        try {
+                            val result = reader.decodeWithState(
+                                BinaryBitmap(binarizer(BufferedImageLuminanceSource(img)))
+                            )
+                            val rawBytes = result.rawBytes
+                            log.info("PDF417 leido con preprocesado (factor={}, umbral={})", factor, umbral)
+                            return if (rawBytes != null && rawBytes.isNotEmpty()) {
+                                String(rawBytes, Charsets.ISO_8859_1)
+                            } else {
+                                result.text
+                            }
+                        } catch (_: NotFoundException) {
+                            // siguiente combinacion
+                        } finally {
+                            reader.reset()
+                        }
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    private fun aGrisEscalado(src: BufferedImage, factor: Double): BufferedImage {
+        val w = (src.width * factor).toInt().coerceAtLeast(1)
+        val h = (src.height * factor).toInt().coerceAtLeast(1)
+        val out = BufferedImage(w, h, BufferedImage.TYPE_BYTE_GRAY)
+        val g = out.createGraphics()
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+        g.drawImage(src, 0, 0, w, h, null)
+        g.dispose()
+        return out
+    }
+
+    private fun binarizar(gris: BufferedImage, umbral: Int): BufferedImage {
+        val out = BufferedImage(gris.width, gris.height, BufferedImage.TYPE_BYTE_GRAY)
+        val src = gris.raster
+        val dst = out.raster
+        val px = IntArray(1)
+        for (j in 0 until gris.height) for (i in 0 until gris.width) {
+            src.getPixel(i, j, px)
+            px[0] = if (px[0] > umbral) 255 else 0
+            dst.setPixel(i, j, px)
+        }
+        return out
     }
 
     private fun scale(img: BufferedImage, factor: Double): BufferedImage {

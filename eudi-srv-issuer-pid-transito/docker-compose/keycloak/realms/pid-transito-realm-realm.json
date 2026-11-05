@@ -27,7 +27,7 @@
   "oauth2DevicePollingInterval": 5,
   "enabled": true,
   "sslRequired": "external",
-  "registrationAllowed": true,
+  "registrationAllowed": false,
   "registrationEmailAsUsername": false,
   "rememberMe": false,
   "verifyEmail": false,
@@ -2962,39 +2962,13 @@
     {
       "id": "7c1f0a52-3b1e-4a57-9a53-5e0a1c9d2b11",
       "alias": "issuer-state-browser",
-      "description": "Login automático con issuer_state (OpenID4VCI) o formulario normal",
+      "description": "Login SOLO con issuer_state (OpenID4VCI): sin ticket válido se niega el acceso",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
       "authenticationExecutions": [
         {
           "authenticator": "issuer-state-authenticator",
-          "authenticatorFlow": false,
-          "requirement": "ALTERNATIVE",
-          "priority": 10,
-          "autheticatorFlow": false,
-          "userSetupAllowed": false
-        },
-        {
-          "authenticatorFlow": true,
-          "flowAlias": "issuer-state-browser forms",
-          "requirement": "ALTERNATIVE",
-          "priority": 20,
-          "autheticatorFlow": true,
-          "userSetupAllowed": false
-        }
-      ]
-    },
-    {
-      "id": "b3a9d4e0-6e47-4c85-8f1d-2d0e77c0a9f4",
-      "alias": "issuer-state-browser forms",
-      "description": "Formulario de usuario y contraseña",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticator": "auth-username-password-form",
           "authenticatorFlow": false,
           "requirement": "REQUIRED",
           "priority": 10,

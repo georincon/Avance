@@ -91,26 +91,36 @@ fi
 echo ">> Levantando el ecosistema..."
 docker compose up -d "${BUILD[@]}" "${ARGUMENTOS_COMPOSE[@]}"
 
-# Keycloak de la Registraduria: los datos (realm, usuarios) viven en el volumen keycloak-reg-data y sobreviven.
-# Aun asi se reaplica, de forma idempotente, el login automatico de newwallet-app y se sincronizan los ciudadanos
-# de la tabla `cedulas` (datos + contrasena = cedula), por si el volumen se recreo o hay ciudadanos nuevos.
-if docker ps --format '{{.Names}}' | grep -qx keycloak-reg; then
-  echo ">> Esperando a Keycloak de la Registraduria..."
+# Keycloak de cada emisor (Registraduria, Transito y UIS): los datos (realm, usuarios) viven en su volumen y sobreviven.
+# Aun asi se reaplica, de forma idempotente, el login SOLO por ticket (flujo issuer-state-browser en los clientes de wallet,
+# sin auto-registro) y se sincronizan los titulares de la base de cada emisor (datos, SIN contrasena), por si el volumen se
+# recreo o hay titulares nuevos. Solo se hace con los que estan en pie.
+# Formato: contenedor | carpeta del emisor | script de sincronizacion
+sincronizar_keycloak() {
+  local contenedor="$1" carpeta="$2" sync="$3"
+  docker ps --format '{{.Names}}' | grep -qx "$contenedor" || return 0
+  echo ">> Esperando a $contenedor..."
   for _ in $(seq 1 60); do
-    [ "$(docker inspect -f '{{.State.Health.Status}}' keycloak-reg 2>/dev/null)" = "healthy" ] && break
+    [ "$(docker inspect -f '{{.State.Health.Status}}' "$contenedor" 2>/dev/null)" = "healthy" ] && break
     sleep 5
   done
-  eudi-srv-issuer-pid-registraduria/docker-compose/keycloak/apply-issuer-state-binding.sh \
-    || echo "   (no se pudo asignar el flujo de login automatico)"
-  python3 eudi-srv-issuer-pid-registraduria/docker-compose/keycloak/sincronizar-ciudadanos.py \
-    || echo "   (no se pudieron sincronizar los ciudadanos con Keycloak)"
-fi
+  "$carpeta/docker-compose/keycloak/apply-issuer-state-binding.sh" \
+    || echo "   ($contenedor: no se pudo asignar el flujo de login por ticket)"
+  python3 "$carpeta/docker-compose/keycloak/$sync" \
+    || echo "   ($contenedor: no se pudieron sincronizar los titulares)"
+}
+sincronizar_keycloak keycloak-reg eudi-srv-issuer-pid-registraduria sincronizar-ciudadanos.py
+sincronizar_keycloak keycloak-tra eudi-srv-issuer-pid-transito sincronizar-licencias.py
 
 # El stack de la UIS, con su propio compose: no esta en el compose raiz.
 if [ "$CON_UIS" -eq 1 ]; then
   echo ">> Levantando el issuer de la UIS..."
   docker compose -f eudi-srv-issuer-pid-uis/docker-compose/docker-compose.yaml \
     up -d "${BUILD[@]}" "${ARGUMENTOS_COMPOSE[@]}"
+fi
+
+if [ "$CON_UIS" -eq 1 ]; then
+  sincronizar_keycloak keycloak-uis eudi-srv-issuer-pid-uis sincronizar-estudiantes.py
 fi
 
 # Los portales de ejemplo, cada uno con su verifier. Van despues: necesitan la red

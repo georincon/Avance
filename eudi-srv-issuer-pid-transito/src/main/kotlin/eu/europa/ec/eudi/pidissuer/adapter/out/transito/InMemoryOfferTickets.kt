@@ -42,11 +42,11 @@ class InMemoryOfferTickets(
     private val tickets = ConcurrentHashMap<String, Entry>()
     private val random = SecureRandom()
 
-    override fun issue(documentNumber: String): String {
+    override fun issue(documentNumber: String, ttl: Duration?): String {
         purge()
         val bytes = ByteArray(32).also(random::nextBytes)
         val ticket = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-        tickets[ticket] = Entry(documentNumber, clock.now() + ttl)
+        tickets[ticket] = Entry(documentNumber, clock.now() + (ttl ?: this.ttl))
         return ticket
     }
 

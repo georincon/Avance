@@ -38,7 +38,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 import segno
 
-from app.route_dynamic import form_formatter, presentation_formatter
+from app.route_dynamic import form_formatter, presentation_formatter, nombre_tramite
 from .app_config.config_service import ConfService as cfgservice
 from app.redirect_func import post_redirect_with_payload
 from app.misc import (
@@ -130,6 +130,7 @@ def preauthRed():
             "mandatory_attributes": mandatory_attributes,
             "optional_attributes": optional_attributes_filtered,
             "credencial_id": credentials_requested[0] if credentials_requested else None,
+            "credencial_nombre": nombre_tramite(credentials_requested[0]) if credentials_requested else None,
             "max_archivo_bytes": validacion.documento_archivo.MAX_BYTES,
             "redirect_url": f"{CONFIGURATION['service_url']}/preauth_form",
             "session_id": session_id,

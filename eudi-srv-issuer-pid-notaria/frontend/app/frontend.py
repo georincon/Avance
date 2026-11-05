@@ -118,6 +118,7 @@ def display_form():
             optional_attributes=optional_attributes,
             redirect_url=redirect_url,
             credencial_id=data_payload.get("credencial_id"),
+            credencial_nombre=data_payload.get("credencial_nombre"),
             max_archivo_bytes=data_payload.get("max_archivo_bytes", 50 * 1024 * 1024),
         )
 

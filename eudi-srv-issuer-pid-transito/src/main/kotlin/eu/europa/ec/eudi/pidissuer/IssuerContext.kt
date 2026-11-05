@@ -44,8 +44,12 @@ import eu.europa.ec.eudi.pidissuer.port.out.attestation.GetAttestationAttributes
 import eu.europa.ec.eudi.pidissuer.adapter.out.transito.R2dbcLicenciaRepository
 import eu.europa.ec.eudi.pidissuer.adapter.out.transito.upsert
 import eu.europa.ec.eudi.pidissuer.adapter.input.web.OnboardingOffersApi
+import eu.europa.ec.eudi.pidissuer.adapter.out.onboarding.HttpCompareOnboardingSelfie
+import eu.europa.ec.eudi.pidissuer.adapter.out.onboarding.HttpFaceMatcher
 import eu.europa.ec.eudi.pidissuer.adapter.out.onboarding.HttpGetOnboardingSession
 import eu.europa.ec.eudi.pidissuer.adapter.out.transito.InMemoryOfferTickets
+import eu.europa.ec.eudi.pidissuer.port.out.transito.CompareOnboardingSelfie
+import eu.europa.ec.eudi.pidissuer.port.out.transito.FaceMatcher
 import eu.europa.ec.eudi.pidissuer.port.out.transito.GetOnboardingSession
 import eu.europa.ec.eudi.pidissuer.port.out.transito.OfferTickets
 import eu.europa.ec.eudi.pidissuer.port.out.transito.SaveLicencia
@@ -301,6 +305,19 @@ internal class AppBeans :
             )
         }
         registerBean<OfferTickets> { InMemoryOfferTickets(bean()) }
+        registerBean<CompareOnboardingSelfie> {
+            HttpCompareOnboardingSelfie(
+                webClient = bean(),
+                baseUrl = env.getProperty("issuer.onboarding.backend-url", "http://192.168.0.240:8095"),
+                apiKey = env.getProperty("issuer.onboarding.internal-api-key"),
+            )
+        }
+        registerBean<FaceMatcher> {
+            HttpFaceMatcher(
+                webClient = bean(),
+                baseUrl = env.getProperty("issuer.biometrics.url", "http://onboarding-biometrics:8100"),
+            )
+        }
         registerBean {
             // Al guardar un ciudadano, además de persistirlo, se sincroniza su
             // usuario fantasma en Keycloak (Opción A, sección 5 de
@@ -525,6 +542,7 @@ internal class AppBeans :
                     ticketApiKey = env.getProperty("issuer.ticket.api-key"),
                     rateLimit = IpRateLimit.fromEnvironment(env, bean(), name = "onboardingOffers", defaultMaxAttempts = 0),
                     isSubjectBlocked = bean(),
+                    compareSelfie = bean(),
                 )
             val transitoAdminUi = TransitoAdminUi(bean(), bean(), bean(), bean(), bean(), bean(), bean())
             val revocationApi = RevocationApi(bean(), env.getProperty("issuer.revocation.api-key"), bean(), bean())
@@ -539,7 +557,7 @@ internal class AppBeans :
             // La pantalla ciudadana "cédula -> QR" no pide autenticación: se puede apagar con una propiedad.
             if (env.getBoolean(TransitoSolicitarUi.ENABLED_PROPERTY, true)) {
                 val solicitarRateLimit = IpRateLimit.fromEnvironment(env, bean(), name = "solicitar", defaultMaxAttempts = 0)
-                routes.and(TransitoSolicitarUi(bean(), bean(), bean(), solicitarRateLimit, bean()).router)
+                routes.and(TransitoSolicitarUi(bean(), bean(), bean(), solicitarRateLimit, bean(), bean(), bean()).router)
             } else {
                 log.warn("{}=false: {} no está disponible", TransitoSolicitarUi.ENABLED_PROPERTY, TransitoSolicitarUi.SOLICITAR)
                 routes

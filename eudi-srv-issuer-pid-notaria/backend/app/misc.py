@@ -49,6 +49,7 @@ from flask.helpers import make_response
 # Local/project-specific imports
 from app import oidc_metadata
 from app import trusted_CAs
+from app.opciones import opciones_del_formulario
 from app_config.config_service import ConfService as cfgservice
 from redirect_func import url_get
 from app import CONFIGURATION
@@ -289,11 +290,15 @@ def getMandatoryAttributes(claims, namespace):
 
 def _add_display_labels(attributes_form, claims):
     """Pone en cada campo de primer nivel el nombre legible (claim.display) para el formulario."""
+    listas = opciones_del_formulario({c["path"][0] for c in claims if c.get("path")})
     for claim in claims:
         name = claim["path"][0]
         display = claim.get("display") or []
         if len(claim["path"]) == 1 and display and isinstance(attributes_form.get(name), dict):
             attributes_form[name]["label"] = display[0].get("name", name)
+        # Campos de lista cerrada (p. ej. el estado civil): el formulario los muestra como menú desplegable.
+        if len(claim["path"]) == 1 and isinstance(attributes_form.get(name), dict) and name in listas:
+            attributes_form[name]["options"] = list(listas[name])
     return attributes_form
 
 

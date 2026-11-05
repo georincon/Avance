@@ -21,6 +21,17 @@ import eu.europa.ec.eudi.pidissuer.port.out.qr.Format
 import eu.europa.ec.eudi.pidissuer.port.out.qr.GenerateQqCode
 import eu.europa.ec.eudi.pidissuer.port.out.qr.Pixels
 import eu.europa.ec.eudi.pidissuer.port.out.transito.FindLicenciaByDocumentNumber
+import eu.europa.ec.eudi.pidissuer.adapter.out.transito.LicenciaHomologation
+import eu.europa.ec.eudi.pidissuer.port.out.transito.FaceMatchResult
+import eu.europa.ec.eudi.pidissuer.port.out.transito.FaceMatcher
+import eu.europa.ec.eudi.pidissuer.port.out.transito.OfferTickets
+import eu.europa.ec.eudi.pidissuer.port.out.transito.OnboardingSession
+import eu.europa.ec.eudi.pidissuer.port.out.transito.SelfieCheck
+import kotlinx.coroutines.reactor.awaitSingleOrNull
+import kotlinx.datetime.LocalDate
+import org.springframework.http.codec.multipart.FilePart
+import org.springframework.http.codec.multipart.FormFieldPart
+import kotlin.time.Duration.Companion.minutes
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -44,13 +55,17 @@ class TransitoSolicitarUi(
     private val generateQrCode: GenerateQqCode,
     private val rateLimit: IpRateLimit = IpRateLimit.disabled(),
     private val isSubjectBlocked: IsSubjectBlocked = IsSubjectBlocked { false },
+    private val tickets: OfferTickets,
+    private val faceMatcher: FaceMatcher,
 ) {
+    private val attempts = FaceAttempts()
+
     val router: RouterFunction<ServerResponse> =
         coRouter {
             GET(SOLICITAR, contentType(MediaType.ALL) and accept(MediaType.TEXT_HTML)) { handleForm(null) }
             POST(
                 SOLICITAR,
-                contentType(MediaType.APPLICATION_FORM_URLENCODED) and accept(MediaType.TEXT_HTML),
+                contentType(MediaType.MULTIPART_FORM_DATA) and accept(MediaType.TEXT_HTML),
                 ::handleSubmit,
             )
         }
@@ -76,8 +91,29 @@ class TransitoSolicitarUi(
         }
         rateLimit.record(request)
 
-        val documentNumber = request.awaitFormData()["documentNumber"]?.firstOrNull()?.trim().orEmpty()
+        val parts = request.awaitMultipartData()
+        val formData = parts.mapValues { (_, list) -> list.filterIsInstance<FormFieldPart>().map { it.value() } }
+        val documentNumber = formData["documentNumber"]?.firstOrNull()?.trim().orEmpty()
+        val firstNames = formData["firstNames"]?.firstOrNull()?.trim().orEmpty()
+        val lastNames = formData["lastNames"]?.firstOrNull()?.trim().orEmpty()
+        val birthDate = formData["birthDate"]?.firstOrNull()?.trim()?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
         if (documentNumber.isBlank()) return handleForm("Debes ingresar tu número de cédula")
+        if (firstNames.isBlank() || lastNames.isBlank() || birthDate == null) {
+            return handleForm("Escribe tus nombres, apellidos y fecha de nacimiento como aparecen en tu cédula.")
+        }
+        val selfie = (parts.getFirst("selfie") as? FilePart)?.readBytes(MAX_SELFIE_BYTES)
+        if (selfie == null || selfie.isEmpty()) return handleForm("Toma o sube una selfie para verificar tu identidad.")
+        // Calidad de la selfie: no depende de la cédula, así que su mensaje no revela si la cédula existe.
+        when (val quality = faceMatcher.checkSelfie(selfie)) {
+            SelfieCheck.Ok -> Unit
+            is SelfieCheck.Bad -> return handleForm("La selfie no sirve: ${quality.reason}. Inténtalo de nuevo con buena luz y de frente.")
+            is SelfieCheck.Unavailable -> return handleForm("El servicio de verificación no está disponible. Inténtalo más tarde.")
+        }
+        // Tope de intentos por cédula (además del límite por IP): frena a quien prueba fotos de otra persona.
+        if (!attempts.allow(documentNumber)) {
+            log.warn("Demasiados intentos de verificación facial para la cédula {}", documentNumber.maskDocumentNumber())
+            return handleForm(GENERIC_ERROR)
+        }
 
         val licencia = findLicenciaByDocumentNumber(LicenciaDocumentNumber(documentNumber))
         // Misma respuesta para "no existe", "no activa", "sin vigencia" y "registro incompleto": el motivo solo queda
@@ -99,8 +135,34 @@ class TransitoSolicitarUi(
             return handleForm(GENERIC_ERROR)
         }
 
+        if (licencia.fotoReferencia == null) {
+            log.info("Solicitud de mDL para licencia sin foto de referencia: {}", documentNumber.maskDocumentNumber())
+            return handleForm(GENERIC_ERROR)
+        }
+        // Primer factor: los datos escritos deben coincidir con los de la licencia (la misma homologación del onboarding).
+        val declared = OnboardingSession("APPROVED", null, documentNumber, firstNames, lastNames, birthDate)
+        if (!LicenciaHomologation.check(declared, licencia).ok) {
+            attempts.fail(documentNumber)
+            log.info("Datos declarados no coinciden para la cédula {}", documentNumber.maskDocumentNumber())
+            return handleForm(GENERIC_ERROR)
+        }
+        // Segundo factor: la selfie se compara con la foto de referencia de la licencia. OJO: no es prueba de vida.
+        when (val result = faceMatcher.match(licencia.fotoReferencia.bytes, selfie)) {
+            is FaceMatchResult.Match -> {
+                attempts.reset(documentNumber)
+                log.info("Verificación facial aprobada para la cédula {} (score {})", documentNumber.maskDocumentNumber(), result.score)
+            }
+            is FaceMatchResult.NoMatch -> {
+                attempts.fail(documentNumber)
+                log.info("Verificación facial NO coincide para la cédula {} (score {})", documentNumber.maskDocumentNumber(), result.score)
+                return handleForm(GENERIC_ERROR)
+            }
+            is FaceMatchResult.Unavailable -> return handleForm("El servicio de verificación no está disponible. Inténtalo más tarde.")
+        }
+        // El QR lleva un ticket (issuer_state) ligado a ESTA cédula: Keycloak solo autentica con ticket, sin formulario.
+        val ticket = tickets.issue(licencia.documentNumber.value, TICKET_TTL)
         return effect<CreateCredentialsOffer.Error, Uri> {
-            createCredentialsOffer(CreateCredentialsOffer.Request(configurationIdsDe(licencia)))
+            createCredentialsOffer(CreateCredentialsOffer.Request(configurationIdsDe(licencia), issuerState = ticket))
         }.fold(
             transform = { offerUri ->
                 log.info("Oferta de mDL generada para solicitud manual (cédula {})", documentNumber.maskDocumentNumber())
@@ -115,6 +177,9 @@ class TransitoSolicitarUi(
 
     companion object {
         const val SOLICITAR: String = "/transito/solicitar"
+        /** Vigencia del ticket del QR: lo justo para escanearlo. */
+        val TICKET_TTL = 5.minutes
+        const val MAX_SELFIE_BYTES: Int = 4 * 1024 * 1024
         /** El Tránsito ofrece un mDL (mso_mdoc) por cada categoría vigente de la licencia. */
         fun configurationIdsDe(licencia: Licencia): Set<CredentialConfigurationId> =
             licencia.categoriasVigentes(java.time.LocalDate.now()).mapTo(linkedSetOf()) { mdlConfigurationId(it.categoria) }
@@ -153,3 +218,46 @@ private suspend fun Uri.qrResponse(
             ),
         )
 }
+
+/** Intentos fallidos de verificación facial por cédula: [max] por ventana; al superarlos se bloquea hasta que pase. */
+private class FaceAttempts(
+    private val max: Int = 5,
+    private val windowMillis: Long = 60 * 60 * 1000L,
+) {
+    private class Entry(var failures: Int, var since: Long)
+
+    private val map = java.util.concurrent.ConcurrentHashMap<String, Entry>()
+
+    fun allow(key: String): Boolean {
+        val e = map[key] ?: return true
+        synchronized(e) {
+            if (System.currentTimeMillis() - e.since > windowMillis) {
+                map.remove(key, e)
+                return true
+            }
+            return e.failures < max
+        }
+    }
+
+    fun fail(key: String) {
+        val now = System.currentTimeMillis()
+        val e = map.computeIfAbsent(key) { Entry(0, now) }
+        synchronized(e) { e.failures++ }
+    }
+
+    fun reset(key: String) {
+        map.remove(key)
+    }
+}
+
+/** Lee el archivo subido; `null` si supera [limit] bytes. */
+private suspend fun FilePart.readBytes(limit: Int): ByteArray? =
+    runCatching {
+        org.springframework.core.io.buffer.DataBufferUtils.join(content(), limit).awaitSingleOrNull()?.let { buffer ->
+            try {
+                ByteArray(buffer.readableByteCount()).also { buffer.read(it) }
+            } finally {
+                org.springframework.core.io.buffer.DataBufferUtils.release(buffer)
+            }
+        } ?: ByteArray(0)
+    }.getOrNull()

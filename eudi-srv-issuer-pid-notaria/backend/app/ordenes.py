@@ -228,7 +228,7 @@ def crear(cliente):
     faltan = sorted(c for c in esquema["campos_requeridos"] if not planos.get(c))
     if faltan:
         return _error(400, "campos_faltantes", "Faltan campos obligatorios.", campos=faltan)
-    problema = validacion.validar(planos)  # fechas, huella y tamaño del archivo (normaliza las fechas)
+    problema = validacion.validar(planos, listas_cerradas=False)  # fechas, huella y tamaño del archivo (normaliza las fechas)
     if problema:
         return _error(422, "datos_no_validos", problema)
 
