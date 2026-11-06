@@ -141,9 +141,12 @@ function publicProject(project, state, running, total, error, keycloak) {
  */
 async function keycloakState(project) {
   if (!project.keycloakService) return null;
-  const propio = await serviceRunning(project, project.keycloakService);
+  // Se busca por el NOMBRE DEL CONTENEDOR de Keycloak (keycloak-reg, keycloak-tra, keycloak-uis): en la Registraduria el
+  // servicio de compose se llama `keycloak`, y buscar por ese nombre no encontraba nunca su contenedor.
+  const contenedorKeycloak = (p) => (p.containers || []).find((n) => /^keycloak/.test(n)) || p.keycloakService;
+  const propio = await serviceRunning(project, contenedorKeycloak(project));
   const pares = (project.peerIds || []).map((id) => projects.find((item) => item.id === id)).filter(Boolean);
-  const parActivo = (await Promise.all(pares.map((par) => serviceRunning(par, par.keycloakService)))).some(Boolean);
+  const parActivo = (await Promise.all(pares.map((par) => serviceRunning(par, contenedorKeycloak(par))))).some(Boolean);
   return {
     service: project.keycloakService,
     name: project.keycloakName,

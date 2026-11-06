@@ -42,6 +42,23 @@ La clave del operador va en el `.env`:
 TL_OPERATOR_KEY=...      # abre la administracion (cabecera X-Api-Key)
 ```
 
+## Dar de alta un emisor: la lista no basta, hay que alimentar también al validador
+
+Registrar un actor en `/tl-publisher/admin` (o con `POST /api/v1/actores`) lo publica en las Trusted Lists, pero **el
+trust-validator no lee las anclas de las listas**: su biblioteca (DSS 6.5 con etsi1196x2 alpha) devuelve 0 certificados de
+la LOTL. Las anclas que de verdad usa están en `eudi-srv-trust-validator/claves/anclas-confianza.jks`, que se construye
+con los `.crt` de `pki/publico/ca/`. Un emisor puede salir «concedido» en la lista y, aun así, que el validador diga
+«Path does not chain with any of the trust anchors». Pasos completos:
+
+1. Registrar el actor (rol `pid`, `qeaa` o `pub-eaa`; `pub-eaa` para el mDL de Tránsito) o añadir el certificado al actor existente.
+2. Copiar la raíz a `pki/publico/ca/<esquema>-<nombre>-<huella8>.crt` (huella8 = primeros 8 hex del SHA-256).
+3. `eudi-srv-trust-validator/scripts/construir-jks-anclas.sh` y recrear el validador:
+   `docker compose up -d --force-recreate --no-deps trust-validator` (con `docker restart` no basta si cambia la caché).
+4. Republicar (`POST /api/v1/publicar`) y comprobar con `eudi-srv-trust-validator/docker/probar-ecosistema.py`.
+
+Si el emisor cambia de raíz **con el mismo nombre** (pasó con la Notaría el 30-oct), la lista y el validador siguen con la
+raíz vieja: no basta con que el nombre coincida, hay que añadir la nueva (sin quitar la anterior si otro proyecto aún la usa).
+
 ## El modelo de datos, en dos capas
 
 | Capa | Tablas | Para qué |
