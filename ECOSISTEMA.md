@@ -236,3 +236,9 @@ lo publicado en las listas).
 usaran la red `default` acabar\u00edan compartiendo red. Cada stack declara por eso su red con nombre
 expl\u00edcito (`registraduria_default`, `spartans_default`...), y los vol\u00famenes llevan su nombre real
 para que las bases de datos no arranquen vac\u00edas.
+
+## Auditoría centralizada de wallets (`srv-auditoria`)
+
+Servicio de **monitoreo** (no cambia roles ni listas de confianza): recibe de cada wallet su alta (usuario + teléfono),
+sus ingresos/salidas y cada solicitud o presentación de credenciales, con resultado y error, y lo muestra en un dashboard
+de solo lectura en `/srv-auditoria/`. Ver `srv-auditoria/README.md`.

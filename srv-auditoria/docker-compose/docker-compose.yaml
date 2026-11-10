@@ -1,0 +1,65 @@
+# Centro de auditoría centralizado — base PostgreSQL + API de ingesta y consulta + dashboard.
+#
+# Recibe lo que reportan las wallets (inicio/cierre de sesión, solicitud y presentación de credenciales,
+# registro de usuario...) y lo muestra en un dashboard de solo lectura.
+#
+# Se publica por el proxy único en  /srv-auditoria  (el dashboard, solo desde IPs de administración)
+# y  /srv-auditoria/api/v1/eventos  (la ingesta, abierta a las wallets pero protegida por clave).
+#
+# Secretos (van en el .env de la raíz, que no se versiona):
+#   AUDITORIA_CLAVE_WALLET   clave que llevan las wallets para reportar
+#   AUDITORIA_TOKEN_PANEL    clave de acceso al dashboard
+#   AUDITORIA_DB_CLAVE       contraseña de PostgreSQL
+
+name: srv-auditoria
+
+services:
+  auditoria-db:
+    image: postgres:17-alpine
+    container_name: auditoria-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: auditoria
+      POSTGRES_USER: auditoria
+      POSTGRES_PASSWORD: ${AUDITORIA_DB_CLAVE:?Configura AUDITORIA_DB_CLAVE en .env}
+      TZ: America/Bogota
+    volumes:
+      - auditoria_datos:/var/lib/postgresql/data
+      # Se ejecuta solo la primera vez (base vacía).
+      - ../db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auditoria -d auditoria"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [auditoria_default]
+
+  auditoria-api:
+    build:
+      context: ..
+    image: srv-auditoria:local
+    container_name: auditoria-api
+    restart: unless-stopped
+    depends_on:
+      auditoria-db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgres://auditoria:${AUDITORIA_DB_CLAVE}@auditoria-db:5432/auditoria
+      AUDITORIA_CLAVE_WALLET: ${AUDITORIA_CLAVE_WALLET:?Configura AUDITORIA_CLAVE_WALLET en .env}
+      AUDITORIA_TOKEN_PANEL: ${AUDITORIA_TOKEN_PANEL:?Configura AUDITORIA_TOKEN_PANEL en .env}
+      PUERTO: "8110"
+      TZ: America/Bogota
+    networks:
+      auditoria_default: {}
+      avance-eudi:
+        aliases: [srv-auditoria]
+
+volumes:
+  auditoria_datos:
+    name: auditoria_datos
+
+networks:
+  auditoria_default:
+    name: auditoria_default
+  avance-eudi:
+    name: avance-eudi
+    external: true

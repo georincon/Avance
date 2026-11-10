@@ -56,6 +56,8 @@ include:
   # ── Servicios de confianza ──
   - path: srv-tl-publisher/docker-compose/docker-compose.yaml
   - path: eudi-srv-trust-validator/docker-compose/docker-compose.yaml
+  # ── Auditoría centralizada de las wallets (monitoreo; no toca emisores ni listas de confianza) ──
+  - path: srv-auditoria/docker-compose/docker-compose.yaml
   # ── Gateway y operación ──
   - path: srv-nw-nginx/docker-compose/docker-compose.yaml
   - path: panel-control/docker-compose/docker-compose.yaml
